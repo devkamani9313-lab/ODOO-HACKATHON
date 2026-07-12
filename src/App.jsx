@@ -42,15 +42,19 @@ import {
 
 
 function AppContent() {
-  const { currentUser, userRole, login, signup, loginAsRole, logout, isDemoMode } = useAuth();
+  const { currentUser, userRole, login, signup, loginAsRole, logout, isDemoMode, toggleMode } = useAuth();
   
   // Navigation Routing States
   const [view, setView] = useState('landing'); // landing, login, signup, app
   const [activeTab, setActiveTab] = useState('dashboard');
   
-  // Login Form States
+  // Auth Form States
+  const [isSignUp, setIsSignUp] = useState(false);
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupPassword, setSignupPassword] = useState('');
+  const [signupRole, setSignupRole] = useState('Manager');
   const [error, setError] = useState('');
   const [formLoading, setFormLoading] = useState(false);
 
@@ -69,15 +73,19 @@ function AppContent() {
     }
   };
 
-  const handleDemoLogin = async (roleKey) => {
+  const handleSignupSubmit = async (e) => {
+    e.preventDefault();
     setError('');
     setFormLoading(true);
     try {
-      await loginAsRole(roleKey);
+      if (signupPassword.length < 6) {
+        throw new Error('Password must be at least 6 characters.');
+      }
+      await signup(signupEmail, signupPassword, signupRole);
       setView('app');
       setActiveTab('dashboard');
     } catch (err) {
-      setError(err.message || 'Demo Login failed.');
+      setError(err.message || 'Registration failed.');
     } finally {
       setFormLoading(false);
     }
@@ -601,133 +609,82 @@ function AppContent() {
   if (view === 'login') {
     return (
       <div className="min-h-screen bg-[#f8fafc] text-[#1e293b] flex items-center justify-center p-6 relative">
+        {/* Decorative background orbs */}
         <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-violet-200/30 rounded-full blur-[120px] pointer-events-none" />
         <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-cyan-200/25 rounded-full blur-[100px] pointer-events-none" />
 
-        <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-12 items-center bg-white/60 border border-white/50 p-8 rounded-3xl shadow-2xl backdrop-blur-lg relative z-10">
-          
-          {/* Left Column: Role Quick Selectors (Demo Access Mode) */}
-          <div className="lg:col-span-6 space-y-6">
-            <div>
-              <button 
-                onClick={() => setView('landing')}
-                className="flex items-center gap-1.5 text-violet-600 hover:text-violet-700 mb-3 font-semibold text-xs transition-colors cursor-pointer"
-              >
-                <ArrowLeft size={14} />
-                <span>Back to homepage</span>
-              </button>
-              <h2 className="text-3xl font-heading font-semibold text-gray-900 tracking-tight">One-Click Entry</h2>
-              <p className="text-xs text-gray-500 mt-1">Select a role card to instantly log in using pre-seeded dashboard templates.</p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Manager Card */}
-              <button 
-                onClick={() => handleDemoLogin('Manager')}
-                className="p-4 rounded-2xl border border-white bg-white/40 hover:bg-white hover:border-violet-300 text-left transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer shadow-md hover:shadow-lg hover:shadow-violet-500/5 group"
-              >
-                <div className="h-9 w-9 rounded-xl bg-violet-500/10 flex items-center justify-center mb-3 group-hover:bg-violet-500 group-hover:text-white transition-all">
-                  <Wrench size={18} className="text-violet-600 group-hover:text-white" />
-                </div>
-                <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wider">Fleet Manager</h4>
-                <p className="text-[10.5px] text-gray-400 mt-1 leading-snug">Full CRUD access to vehicles, driver records, and maintenance logs.</p>
-              </button>
-
-              {/* Driver Card */}
-              <button 
-                onClick={() => handleDemoLogin('Driver')}
-                className="p-4 rounded-2xl border border-white bg-white/40 hover:bg-white hover:border-amber-300 text-left transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer shadow-md hover:shadow-lg hover:shadow-amber-500/5 group"
-              >
-                <div className="h-9 w-9 rounded-xl bg-amber-500/10 flex items-center justify-center mb-3 group-hover:bg-amber-500 group-hover:text-white transition-all">
-                  <MapTrifold size={18} className="text-amber-600 group-hover:text-white" />
-                </div>
-                <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wider">Driver Portal</h4>
-                <p className="text-[10.5px] text-gray-400 mt-1 leading-snug">View and execute dispatched orders, log fuel refills and distance metrics.</p>
-              </button>
-
-              {/* Safety Officer Card */}
-              <button 
-                onClick={() => handleDemoLogin('Safety')}
-                className="p-4 rounded-2xl border border-white bg-white/40 hover:bg-white hover:border-emerald-300 text-left transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer shadow-md hover:shadow-lg hover:shadow-emerald-500/5 group"
-              >
-                <div className="h-9 w-9 rounded-xl bg-emerald-500/10 flex items-center justify-center mb-3 group-hover:bg-emerald-500 group-hover:text-white transition-all">
-                  <Users size={18} className="text-emerald-600 group-hover:text-white" />
-                </div>
-                <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wider">Safety Officer</h4>
-                <p className="text-[10.5px] text-gray-400 mt-1 leading-snug">Audit license expiry alerts and issue safety score infraction deductions.</p>
-              </button>
-
-              {/* Financial Analyst Card */}
-              <button 
-                onClick={() => handleDemoLogin('Analyst')}
-                className="p-4 rounded-2xl border border-white bg-white/40 hover:bg-white hover:border-cyan-300 text-left transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer shadow-md hover:shadow-lg hover:shadow-cyan-500/5 group"
-              >
-                <div className="h-9 w-9 rounded-xl bg-cyan-500/10 flex items-center justify-center mb-3 group-hover:bg-cyan-500 group-hover:text-white transition-all">
-                  <PresentationChart size={18} className="text-cyan-600 group-hover:text-white" />
-                </div>
-                <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wider">Financial Analyst</h4>
-                <p className="text-[10.5px] text-gray-400 mt-1 leading-snug">Examine fuel efficiencies, operational expenditures, and vehicle ROI logs.</p>
-              </button>
-            </div>
+        <div className="w-full max-w-md bg-white border border-slate-200/80 p-8 rounded-3xl shadow-2xl backdrop-blur-lg relative z-10 space-y-6">
+          <div className="flex items-center justify-between">
+            <button 
+              onClick={() => setView('landing')}
+              className="flex items-center gap-1.5 text-violet-600 hover:text-violet-750 font-bold text-xs transition-colors cursor-pointer"
+            >
+              <ArrowLeft size={14} />
+              <span>Back</span>
+            </button>
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+              Live Database Mode
+            </span>
           </div>
 
-          {/* Right Column: Secure Email/Password Login Form */}
-          <div className="lg:col-span-6 bg-white p-6 rounded-2xl border border-gray-200/80 shadow-lg space-y-6">
-            <div>
-              <h3 className="text-xl font-heading font-semibold text-gray-900">Manual Sign In</h3>
-              <p className="text-xs text-gray-500 mt-0.5">Enter authorized employee credentials.</p>
+          <div className="text-center space-y-2">
+            <div className="mx-auto h-11 w-11 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-650 flex items-center justify-center shadow-lg shadow-violet-500/20 mb-2">
+              <Sparkle size={22} weight="fill" className="text-white" />
             </div>
-
-            {error && (
-              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-xs font-medium text-red-600 text-center">
-                {error}
-              </div>
-            )}
-
-            <form onSubmit={handleLoginSubmit} className="space-y-4 text-xs">
-              {/* Email Input */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Email Address</label>
-                <div className="relative">
-                  <input
-                    type="email"
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    placeholder="e.g. employee@transitops.com"
-                    className="w-full bg-gray-55 border border-gray-200 rounded-xl px-4 py-3 pl-10 text-sm text-gray-900 focus:outline-none focus:border-violet-500 focus:bg-white"
-                  />
-                  <EnvelopeSimple size={18} className="absolute left-3.5 top-3.5 text-gray-400" />
-                </div>
-              </div>
-
-              {/* Password Input */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Password</label>
-                <div className="relative">
-                  <input
-                    type="password"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full bg-gray-55 border border-gray-200 rounded-xl px-4 py-3 pl-10 text-sm text-gray-900 focus:outline-none focus:border-violet-500 focus:bg-white"
-                  />
-                  <LockSimple size={18} className="absolute left-3.5 top-3.5 text-gray-400" />
-                </div>
-              </div>
-
-              {/* Submit */}
-              <button
-                type="submit"
-                disabled={formLoading}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-650 hover:from-violet-500 hover:to-indigo-550 text-white font-bold text-sm transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer text-center shadow-md shadow-violet-600/10"
-              >
-                {formLoading ? 'Authenticating...' : 'Sign In'}
-              </button>
-            </form>
-
-            {/* Removed public signup option. Accounts must be registered by a Manager. */}
+            <h2 className="text-2xl font-heading font-bold text-slate-900 tracking-tight">
+              Welcome Back
+            </h2>
+            <p className="text-xs text-slate-500">
+              Log in to access your operations dashboard.
+            </p>
           </div>
 
+          {error && (
+            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs font-semibold text-red-650 text-center">
+              {error}
+            </div>
+          )}
+
+          {/* SIGN IN FORM */}
+          <form onSubmit={handleLoginSubmit} className="space-y-4 text-xs">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Email Address</label>
+              <div className="relative">
+                <input
+                  type="email"
+                  required
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  placeholder="manager@transitops.com"
+                  className="w-full bg-slate-55 border border-slate-200 rounded-xl px-4 py-3 pl-10 text-sm text-slate-900 focus:outline-none focus:border-violet-500 focus:bg-white"
+                />
+                <EnvelopeSimple size={18} className="absolute left-3.5 top-3.5 text-gray-400" />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Password</label>
+              <div className="relative">
+                <input
+                  type="password"
+                  required
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full bg-slate-55 border border-slate-200 rounded-xl px-4 py-3 pl-10 text-sm text-slate-900 focus:outline-none focus:border-violet-500 focus:bg-white"
+                />
+                <LockSimple size={18} className="absolute left-3.5 top-3.5 text-gray-400" />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={formLoading}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-650 hover:from-violet-500 hover:to-indigo-550 text-white font-bold text-sm transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer shadow-md shadow-violet-600/10"
+            >
+              {formLoading ? 'Authenticating...' : 'Sign In'}
+            </button>
+          </form>
         </div>
       </div>
     );

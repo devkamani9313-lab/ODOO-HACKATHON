@@ -6,9 +6,11 @@ import {
   doc, 
   query, 
   where,
-  deleteDoc
+  deleteDoc,
+  setDoc
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, secondaryAuth } from '../firebase';
+import { createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 
 // Helper to check if a license is expired
 export const isLicenseExpired = (expiryDateString) => {
@@ -146,7 +148,13 @@ export const deleteVehicle = async (isDemo, vehicleId) => {
 
 export const addDriver = async (isDemo, driver) => {
   const payload = {
-    ...driver,
+    name: driver.name,
+    role: driver.role,
+    email: driver.email,
+    licenseNumber: driver.licenseNumber,
+    licenseCategory: driver.licenseCategory,
+    licenseExpiryDate: driver.licenseExpiryDate,
+    contactNumber: driver.contactNumber,
     safetyScore: Number(driver.safetyScore) || 100,
     status: driver.status || 'Available'
   };
@@ -158,8 +166,30 @@ export const addDriver = async (isDemo, driver) => {
     saveLocalData('drivers', list);
     return newDriver;
   }
-  const ref = await addDoc(collection(db, 'drivers'), payload);
-  return { id: ref.id, ...payload };
+
+  // 1. Create a Firebase Authentication User for this staff member so they can log in
+  try {
+    const credential = await createUserWithEmailAndPassword(secondaryAuth, driver.email, driver.password);
+    
+    // 2. Set their System Role in the users collection
+    await setDoc(doc(db, 'users', credential.user.uid), {
+      uid: credential.user.uid,
+      email: driver.email,
+      role: driver.role
+    });
+
+    // 3. Store their profile in the drivers collection (with matching ID)
+    const newDriverPayload = { id: credential.user.uid, ...payload };
+    await setDoc(doc(db, 'drivers', credential.user.uid), newDriverPayload);
+    
+    // 4. Sign out the secondary app connection so it doesn't linger
+    await signOut(secondaryAuth);
+    
+    return newDriverPayload;
+  } catch (authError) {
+    console.error("Firebase Auth staff creation failed:", authError);
+    throw new Error(`Failed to create login account: ${authError.message}`);
+  }
 };
 
 export const updateDriver = async (isDemo, driverId, updates) => {
