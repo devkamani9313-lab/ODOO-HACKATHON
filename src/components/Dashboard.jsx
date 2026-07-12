@@ -16,16 +16,158 @@ import {
   CaretRight,
   GasPump,
   Globe,
-  Lightbulb
+  Lightbulb,
+  Sun,
+  Cloud,
+  CloudRain,
+  CloudLightning
 } from '@phosphor-icons/react';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 import { getVehicles, getDrivers, getTrips, getFuelLogs, getExpenses, getIncidents, getMaintenanceLogs } from '../services/dataManager';
 import { useAuth } from '../context/AuthContext';
 import { FleetManagerCharts, DriverCharts, FinancialAnalystCharts, SafetyOfficerCharts } from './DashboardCharts';
 import { generateTripReportPDF } from '../utils/generateTripReportPDF';
 
+// Pseudo-random seed weather generator utilizing geographical coordinate models
+function generateMockWeather(locationName, lat, lon, dateString) {
+  const getSeed = (str) => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return Math.abs(hash);
+  };
+
+  const seed = getSeed(locationName + dateString);
+  const month = parseInt(dateString.split('-')[1]) || 6; // default to June
+
+  // Determine weather type probability based on month (monsoon: June-Sept)
+  let condition = 'Sunny';
+  let rand = seed % 100;
+  
+  if (month >= 6 && month <= 9) {
+    if (rand < 50) condition = 'Rainy';
+    else if (rand < 80) condition = 'Thunderstorm';
+    else condition = 'Cloudy';
+  } else if (month === 12 || month === 1 || month === 2) {
+    if (rand < 40) condition = 'Cloudy';
+    else condition = 'Sunny';
+  } else {
+    if (rand < 15) condition = 'Cloudy';
+    else if (rand < 25) condition = 'Rainy';
+    else condition = 'Sunny';
+  }
+
+  // Base min/max temperatures based on latitude and month
+  let baseMin = 22;
+  let baseMax = 32;
+
+  // Heuristics mapping coordinates to actual climate zones across India
+  if (lat > 25) {
+    // North India (Srinagar, Delhi, etc.)
+    if (month === 12 || month === 1 || month === 2) {
+      baseMin = Math.max(2, Math.round(15 - (lat - 25) * 2));
+      baseMax = Math.max(12, Math.round(25 - (lat - 25) * 1.5));
+    } else if (month >= 5 && month <= 7) {
+      baseMin = 26;
+      baseMax = Math.min(45, Math.round(38 + (lat - 25) * 0.5));
+    } else {
+      baseMin = 16;
+      baseMax = 28;
+    }
+  } else if (lat < 15) {
+    // South India (Bengaluru, Chennai, etc. stable tropical)
+    baseMin = 22 + (month === 12 || month === 1 ? -2 : 0);
+    baseMax = 32 + (month >= 3 && month <= 5 ? 3 : 0);
+    
+    // Altitude check (like Bengaluru)
+    if (locationName.toLowerCase().includes('bengaluru') || locationName.toLowerCase().includes('bangalore') || (lat > 12 && lat < 14 && lon > 77 && lon < 78)) {
+      baseMin -= 4;
+      baseMax -= 3;
+    }
+  } else {
+    // Central/Coastal India (Mumbai, Kolkata, Pune)
+    baseMin = 23;
+    baseMax = 33;
+    if (month === 12 || month === 1) {
+      baseMin = 18;
+      baseMax = 28;
+    }
+    if (locationName.toLowerCase().includes('pune')) {
+      baseMin -= 2;
+      baseMax -= 1;
+    }
+  }
+
+  const hourly = [];
+  const hours = [6, 8, 10, 12, 14, 16, 18, 20, 22];
+  
+  hours.forEach(hour => {
+    let timeOffset = 0;
+    if (hour === 6) timeOffset = 0;
+    else if (hour === 8) timeOffset = 2;
+    else if (hour === 10) timeOffset = 5;
+    else if (hour === 12) timeOffset = 8;
+    else if (hour === 14) timeOffset = 10;
+    else if (hour === 16) timeOffset = 9;
+    else if (hour === 18) timeOffset = 6;
+    else if (hour === 20) timeOffset = 3;
+    else if (hour === 22) timeOffset = 1;
+
+    let hourTemp = baseMin + Math.round((baseMax - baseMin) * (timeOffset / 10));
+    hourTemp += (seed + hour) % 3 - 1;
+
+    let rainChance = 0;
+    if (condition === 'Rainy') {
+      rainChance = 60 + ((seed + hour) % 40);
+    } else if (condition === 'Thunderstorm') {
+      rainChance = 80 + ((seed + hour) % 20);
+    } else if (condition === 'Cloudy') {
+      rainChance = 20 + ((seed + hour) % 30);
+    } else {
+      rainChance = ((seed + hour) % 10);
+    }
+
+    hourly.push({
+      time: `${hour.toString().padStart(2, '0')}:00`,
+      temp: hourTemp,
+      rain: rainChance
+    });
+  });
+
+  const avgTemp = Math.round(hourly.reduce((sum, h) => sum + h.temp, 0) / hourly.length);
+  const maxTemp = Math.max(...hourly.map(h => h.temp));
+  const minTemp = Math.min(...hourly.map(h => h.temp));
+
+  let humidity = 60 + (seed % 30);
+  let windSpeed = 10 + (seed % 25);
+  if (condition === 'Rainy' || condition === 'Thunderstorm') {
+    humidity = 85 + (seed % 15);
+    windSpeed = 20 + (seed % 30);
+  }
+
+  return {
+    location: locationName,
+    date: dateString,
+    condition,
+    avgTemp,
+    maxTemp,
+    minTemp,
+    humidity,
+    windSpeed,
+    hourly
+  };
+}
+
 export default function Dashboard() {
   const { isDemoMode, userRole, currentUser } = useAuth();
   const [currentTipIndex, setCurrentTipIndex] = useState(0);
+  const [weatherDate, setWeatherDate] = useState(new Date().toISOString().split('T')[0]);
+  const [weatherLocationInput, setWeatherLocationInput] = useState('Mumbai');
+  const [selectedWeatherLoc, setSelectedWeatherLoc] = useState({ name: 'Mumbai', lat: 19.0760, lon: 72.8777 });
+  const [weatherSuggestions, setWeatherSuggestions] = useState([]);
+  const [showWeatherSuggestions, setShowWeatherSuggestions] = useState(false);
+  const [weatherReport, setWeatherReport] = useState(null);
   
   const [vehicles, setVehicles] = useState([]);
   const [drivers, setDrivers] = useState([]);
@@ -79,6 +221,71 @@ export default function Dashboard() {
     }
     loadData();
   }, [isDemoMode]);
+
+  // Set default weather location once trips and drivers are loaded
+  useEffect(() => {
+    if (userRole === 'Driver' && trips.length > 0 && drivers.length > 0) {
+      const driverNameFromEmail = currentUser?.email?.split('@')[0]?.toLowerCase() || '';
+      const currentDriver = drivers.find(d => 
+        d.id === currentUser?.uid || 
+        d.email?.toLowerCase() === currentUser?.email?.toLowerCase() ||
+        (d.name && d.name.toLowerCase().includes(driverNameFromEmail))
+      );
+      if (currentDriver) {
+        const driverTrips = trips.filter(t => 
+          t.driverId === currentDriver.id || 
+          t.driverId === currentUser?.uid ||
+          (t.driverName && t.driverName.toLowerCase().includes(driverNameFromEmail))
+        );
+        const activeTrip = driverTrips.find(t => t.status === 'Dispatched');
+        if (activeTrip && activeTrip.destination) {
+          const city = activeTrip.destination.split(',')[0].trim();
+          setWeatherLocationInput(city);
+          let defLat = 19.0760, defLon = 72.8777;
+          if (city.toLowerCase().includes('delhi')) { defLat = 28.7041; defLon = 77.1025; }
+          else if (city.toLowerCase().includes('bengaluru') || city.toLowerCase().includes('bangalore')) { defLat = 12.9716; defLon = 77.5946; }
+          else if (city.toLowerCase().includes('chennai')) { defLat = 13.0827; defLon = 80.2707; }
+          else if (city.toLowerCase().includes('kolkata')) { defLat = 22.5726; defLon = 88.3639; }
+          else if (city.toLowerCase().includes('pune')) { defLat = 18.5204; defLon = 73.8567; }
+          setSelectedWeatherLoc({ name: city, lat: defLat, lon: defLon });
+        } else {
+          setWeatherLocationInput('Mumbai');
+          setSelectedWeatherLoc({ name: 'Mumbai', lat: 19.0760, lon: 72.8777 });
+        }
+      } else {
+        setWeatherLocationInput('Mumbai');
+        setSelectedWeatherLoc({ name: 'Mumbai', lat: 19.0760, lon: 72.8777 });
+      }
+    }
+  }, [trips, drivers, userRole, currentUser]);
+
+  // Search autocompletion list for Indian cities from Nominatim API
+  useEffect(() => {
+    if (userRole !== 'Driver') return;
+    if (weatherLocationInput.length < 3) {
+      setWeatherSuggestions([]);
+      return;
+    }
+    const delayDebounce = setTimeout(async () => {
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(weatherLocationInput)}&countrycodes=in&limit=5`);
+        const data = await res.json();
+        setWeatherSuggestions(data || []);
+      } catch (err) {
+        console.error("Failed to query Indian locations", err);
+      }
+    }, 450);
+
+    return () => clearTimeout(delayDebounce);
+  }, [weatherLocationInput, userRole]);
+
+  // Auto fetch weather on coordinate/date change
+  useEffect(() => {
+    if (userRole === 'Driver' && selectedWeatherLoc && weatherDate) {
+      const report = generateMockWeather(selectedWeatherLoc.name, selectedWeatherLoc.lat, selectedWeatherLoc.lon, weatherDate);
+      setWeatherReport(report);
+    }
+  }, [selectedWeatherLoc, weatherDate, userRole]);
 
   // Apply filters to vehicles first (all KPIs are derived from filtered list)
   const filteredVehicles = vehicles.filter(v => {
@@ -445,7 +652,188 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-        </div>
+        </div>        {/* Weather Forecast Section */}
+        {(() => {
+          const getWeatherIcon = (cond) => {
+            switch (cond) {
+              case 'Sunny': return <Sun size={48} className="text-amber-500 animate-pulse" weight="fill" />;
+              case 'Cloudy': return <Cloud size={48} className="text-slate-400 animate-pulse" weight="fill" />;
+              case 'Rainy': return <CloudRain size={48} className="text-cyan-500 animate-bounce" weight="fill" />;
+              case 'Thunderstorm': return <CloudLightning size={48} className="text-violet-650 animate-pulse" weight="fill" />;
+              default: return <Sun size={48} className="text-amber-500" />;
+            }
+          };
+
+          const getWeatherWarning = (cond) => {
+            switch (cond) {
+              case 'Rainy':
+                return {
+                  title: "Slippery Road Conditions",
+                  text: "Rain detected. Braking distances are increased. Reduce speeds by 15-20% and avoid hard braking.",
+                  bg: "bg-cyan-50/70 border-cyan-200 text-cyan-800",
+                  icon: <WarningCircle size={18} className="text-cyan-600 animate-pulse" />
+                };
+              case 'Thunderstorm':
+                return {
+                  title: "Severe Weather Hazard Alert",
+                  text: "Active thunderstorms in route. Watch out for crosswinds, waterlogged sections, and sudden downpours. Maintain a high safety distance.",
+                  bg: "bg-red-50/70 border-red-200 text-red-800",
+                  icon: <WarningCircle size={18} className="text-red-500 animate-pulse" />
+                };
+              case 'Cloudy':
+                return {
+                  title: "Overcast Visibility Alert",
+                  text: "Overcast skies might decrease visibility. Ensure daytime running lamps are turned on.",
+                  bg: "bg-slate-50/80 border-slate-200 text-slate-700",
+                  icon: <WarningCircle size={18} className="text-slate-500" />
+                };
+              default:
+                return {
+                  title: "Optimal Travel Conditions",
+                  text: "Clear, sunny skies reported. Visibility index is high. Safe travels!",
+                  bg: "bg-emerald-50/70 border-emerald-200 text-emerald-800",
+                  icon: <CheckCircle size={18} className="text-emerald-600" />
+                };
+            }
+          };
+
+          const handleSelectWeatherLocation = (item) => {
+            const cityName = item.display_name.split(',')[0].trim();
+            setWeatherLocationInput(item.display_name);
+            setSelectedWeatherLoc({
+              name: cityName,
+              lat: parseFloat(item.lat),
+              lon: parseFloat(item.lon)
+            });
+            setShowWeatherSuggestions(false);
+          };
+
+          return (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Weather Form & Current Overview */}
+              <div className="lg:col-span-1 bg-white border border-slate-200/80 p-6 rounded-2xl flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow relative">
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-slate-900 font-heading font-bold text-base leading-tight">Route Weather Forecast</h3>
+                    <p className="text-slate-455 text-xs mt-1 block">Search any city/hub across India for seasonal forecast updates.</p>
+                  </div>
+
+                  {/* Form inputs */}
+                  <div className="space-y-3 text-xs relative">
+                    <div className="flex flex-col gap-1.5 relative">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Search City (India)</label>
+                      <input 
+                        type="text"
+                        value={weatherLocationInput}
+                        onChange={(e) => {
+                          setWeatherLocationInput(e.target.value);
+                          setShowWeatherSuggestions(true);
+                        }}
+                        onBlur={() => setTimeout(() => setShowWeatherSuggestions(false), 250)}
+                        placeholder="Type city name (e.g. Pune, Srinagar)..."
+                        className="w-full bg-slate-55 border border-slate-200 rounded-xl px-3.5 py-2 text-sm text-slate-900 focus:outline-none focus:border-violet-500 font-semibold"
+                      />
+                      {/* Geocoding Dropdown Suggestions */}
+                      {showWeatherSuggestions && weatherSuggestions.length > 0 && (
+                        <ul className="absolute z-[999] top-[55px] left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden divide-y divide-slate-100 max-h-48 overflow-y-auto">
+                          {weatherSuggestions.map((item) => (
+                            <li 
+                              key={item.place_id} 
+                              onMouseDown={() => handleSelectWeatherLocation(item)}
+                              className="px-4 py-2.5 hover:bg-slate-50 cursor-pointer text-xs text-slate-700 font-medium truncate"
+                            >
+                              {item.display_name}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Forecast Date</label>
+                      <input 
+                        type="date"
+                        value={weatherDate}
+                        onChange={(e) => setWeatherDate(e.target.value)}
+                        className="w-full bg-slate-55 border border-slate-200 rounded-xl px-3.5 py-2 text-sm text-slate-900 focus:outline-none focus:border-violet-500 font-semibold cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Weather Overview Summary */}
+                {weatherReport && (
+                  <div className="mt-6 pt-6 border-t border-slate-100 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {getWeatherIcon(weatherReport.condition)}
+                      <div>
+                        <span className="text-2xl font-bold font-mono text-slate-800">{weatherReport.avgTemp}°C</span>
+                        <span className="text-xs font-semibold text-slate-500 block mt-0.5">{weatherReport.condition}</span>
+                      </div>
+                    </div>
+                    <div className="text-[11px] text-slate-505 text-right space-y-1">
+                      <div>Max/Min: <strong className="font-mono text-slate-800">{weatherReport.maxTemp}°C / {weatherReport.minTemp}°C</strong></div>
+                      <div>Humidity: <strong className="font-mono text-slate-800">{weatherReport.humidity}%</strong></div>
+                      <div>Wind: <strong className="font-mono text-slate-800">{weatherReport.windSpeed} km/h</strong></div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Weather Area Chart & Advisory */}
+              <div className="lg:col-span-2 bg-white border border-slate-200/80 p-6 rounded-2xl flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-slate-900 font-heading font-bold text-base leading-tight">Hourly Weather Trend</h3>
+                    <span className="text-[10px] font-mono text-slate-400 font-bold uppercase tracking-wider truncate max-w-[200px]" title={selectedWeatherLoc?.name}>
+                      {selectedWeatherLoc?.name} • {weatherDate}
+                    </span>
+                  </div>
+
+                  {/* Dynamic Advisory Box */}
+                  {weatherReport && (() => {
+                    const adv = getWeatherWarning(weatherReport.condition);
+                    return (
+                      <div className={`p-4 rounded-xl border flex items-start gap-3 ${adv.bg}`}>
+                        <div className="mt-0.5 flex-shrink-0">{adv.icon}</div>
+                        <div>
+                          <h4 className="text-xs font-bold font-heading">{adv.title}</h4>
+                          <p className="text-[11px] mt-0.5 leading-relaxed font-medium">{adv.text}</p>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Recharts Area Chart */}
+                  <div className="h-48 w-full mt-2">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={weatherReport?.hourly || []} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="tempGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.25}/>
+                            <stop offset="95%" stopColor="#7c3aed" stopOpacity={0.0}/>
+                          </linearGradient>
+                          <linearGradient id="rainGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.25}/>
+                            <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.0}/>
+                          </linearGradient>
+                        </defs>
+                        <XAxis dataKey="time" stroke="#94a3b8" fontSize={9} tickLine={false} />
+                        <YAxis stroke="#94a3b8" fontSize={9} tickLine={false} />
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '10px' }}
+                          labelStyle={{ fontWeight: 'bold', color: '#1e293b' }}
+                        />
+                        <Area type="monotone" dataKey="temp" name="Temp (°C)" stroke="#7c3aed" strokeWidth={2} fillOpacity={1} fill="url(#tempGradient)" />
+                        <Area type="monotone" dataKey="rain" name="Rain (%)" stroke="#06b6d4" strokeWidth={1} fillOpacity={1} fill="url(#rainGradient)" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Trips Log */}
         <div className="bg-white border border-slate-200/80 p-6 rounded-2xl shadow-sm space-y-4">
