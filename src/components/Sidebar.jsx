@@ -9,7 +9,8 @@ import {
   Receipt, 
   PresentationChart, 
   SignOut,
-  User
+  User,
+  WarningCircle
 } from '@phosphor-icons/react';
 import { useAuth } from '../context/AuthContext';
 
@@ -19,11 +20,12 @@ export default function Sidebar({ activeTab, setActiveTab }) {
   const allTabs = [
     { id: 'dashboard', label: 'Dashboard', icon: ChartBar, roles: ['Manager', 'Driver', 'Safety Officer', 'Financial Analyst'] },
     { id: 'vehicles', label: 'Vehicle Registry', icon: Truck, roles: ['Manager'] },
-    { id: 'drivers', label: 'Staff Registry', icon: Users, roles: ['Manager', 'Safety Officer'] },
+    { id: 'drivers', label: 'Staff Registry', icon: Users, roles: ['Manager'] },
     { id: 'trips', label: 'Trip Management', icon: MapTrifold, roles: ['Manager', 'Driver'] },
     { id: 'maintenance', label: 'Maintenance Log', icon: Wrench, roles: ['Manager'] },
-    { id: 'expenses', label: 'Fuel & Expenses', icon: Receipt, roles: ['Manager', 'Financial Analyst'] },
-    { id: 'reports', label: 'Reports & ROI', icon: PresentationChart, roles: ['Manager', 'Financial Analyst'] }
+    { id: 'expenses', label: 'Fuel & Expenses', icon: Receipt, roles: ['Manager', 'Financial Analyst', 'Driver'] },
+    { id: 'reports', label: 'Reports & ROI', icon: PresentationChart, roles: ['Manager', 'Financial Analyst'] },
+    { id: 'incidents', label: 'Driver Complaints', icon: WarningCircle, roles: ['Manager', 'Safety Officer'] }
   ];
 
   // Filter tabs based on active user role

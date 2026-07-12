@@ -8,6 +8,7 @@ import Trips from './components/Trips';
 import Maintenance from './components/Maintenance';
 import Expenses from './components/Expenses';
 import Reports from './components/Reports';
+import Incidents from './components/Incidents';
 import { 
   Sparkle, 
   CaretRight, 
@@ -42,7 +43,7 @@ import {
 
 
 function AppContent() {
-  const { currentUser, userRole, login, signup, loginAsRole, logout, isDemoMode, toggleMode } = useAuth();
+  const { currentUser, userRole, setUserRole, login, signup, loginAsRole, logout, isDemoMode, toggleMode } = useAuth();
   
   // Navigation Routing States
   const [view, setView] = useState('landing'); // landing, login, signup, app
@@ -98,15 +99,17 @@ function AppContent() {
       case 'vehicles':
         return userRole === 'Manager' ? <Vehicles /> : <AccessDenied />;
       case 'drivers':
-        return (userRole === 'Manager' || userRole === 'Safety Officer') ? <Drivers /> : <AccessDenied />;
+        return userRole === 'Manager' ? <Drivers /> : <AccessDenied />;
       case 'trips':
         return (userRole === 'Manager' || userRole === 'Driver') ? <Trips /> : <AccessDenied />;
       case 'maintenance':
         return userRole === 'Manager' ? <Maintenance /> : <AccessDenied />;
       case 'expenses':
-        return (userRole === 'Manager' || userRole === 'Financial Analyst') ? <Expenses /> : <AccessDenied />;
+        return (userRole === 'Manager' || userRole === 'Financial Analyst' || userRole === 'Driver') ? <Expenses /> : <AccessDenied />;
       case 'reports':
         return (userRole === 'Manager' || userRole === 'Financial Analyst') ? <Reports /> : <AccessDenied />;
+      case 'incidents':
+        return (userRole === 'Manager' || userRole === 'Safety Officer') ? <Incidents /> : <AccessDenied />;
       default:
         return <Dashboard />;
     }
@@ -704,6 +707,12 @@ function AppContent() {
             <span className="text-xs text-slate-400 font-mono hidden md:inline">
               ({currentUser?.email})
             </span>
+            <button
+              onClick={() => setUserRole(prev => prev === 'Manager' ? 'Driver' : 'Manager')}
+              className="text-[10px] bg-violet-100 hover:bg-violet-200 text-violet-700 font-bold px-2.5 py-1 rounded-lg transition-colors cursor-pointer active:scale-95 border border-violet-200/50"
+            >
+              Toggle Role (Dev Tools)
+            </button>
           </div>
           
           <button

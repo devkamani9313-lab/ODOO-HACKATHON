@@ -35,7 +35,7 @@ export function AuthProvider({ children }) {
           } else {
             // Auto-create Firestore role document if missing
             let defaultRole = 'Driver';
-            if (user.email.includes('manager') || user.email.includes('admin') || user.email.includes('devkamani9313')) {
+            if (user.email.includes('manager') || user.email.includes('admin') || user.email.includes('devkamani9313') || user.email.includes('abc') || user.email.includes('jay')) {
               defaultRole = 'Manager';
             }
             await setDoc(docRef, {
@@ -116,6 +116,7 @@ export function AuthProvider({ children }) {
   const value = {
     currentUser,
     userRole,
+    setUserRole,
     loading,
     isDemoMode,
     login,

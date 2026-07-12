@@ -10,7 +10,7 @@ import {
   CheckCircle,
   Funnel
 } from '@phosphor-icons/react';
-import { getVehicles, getDrivers, getTrips, getFuelLogs, getExpenses } from '../services/dataManager';
+import { getVehicles, getDrivers, getTrips, getFuelLogs, getExpenses, getIncidents } from '../services/dataManager';
 import { useAuth } from '../context/AuthContext';
 
 export default function Dashboard() {
@@ -21,6 +21,7 @@ export default function Dashboard() {
   const [trips, setTrips] = useState([]);
   const [fuelLogs, setFuelLogs] = useState([]);
   const [expenses, setExpenses] = useState([]);
+  const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Filters State
@@ -31,18 +32,20 @@ export default function Dashboard() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [v, d, t, f, e] = await Promise.all([
+        const [v, d, t, f, e, inc] = await Promise.all([
           getVehicles(isDemoMode),
           getDrivers(isDemoMode),
           getTrips(isDemoMode),
           getFuelLogs(isDemoMode),
-          getExpenses(isDemoMode)
+          getExpenses(isDemoMode),
+          getIncidents(isDemoMode)
         ]);
         setVehicles(v);
         setDrivers(d);
         setTrips(t);
         setFuelLogs(f);
         setExpenses(e);
+        setIncidents(inc);
       } catch (err) {
         console.error("Failed to load dashboard metrics", err);
       } finally {
@@ -92,6 +95,10 @@ export default function Dashboard() {
   
   const lowSafetyScoreCount = drivers.filter(d => d.safetyScore < 70).length;
 
+  const avgSafetyScore = drivers.length > 0
+    ? Math.round(drivers.reduce((sum, d) => sum + Number(d.safetyScore || 0), 0) / drivers.length)
+    : 100;
+
   // Cost metrics (for Financial Analyst card)
   const totalFuelCost = fuelLogs.reduce((sum, log) => sum + (Number(log.cost) || 0), 0);
   const totalOtherExpenses = expenses.reduce((sum, exp) => sum + (Number(exp.cost) || 0), 0);
@@ -103,6 +110,159 @@ export default function Dashboard() {
         <div className="flex flex-col items-center gap-3">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-violet-600"></div>
           <span className="text-slate-500 text-sm font-semibold">Loading fleet analytics...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (userRole === 'Safety Officer') {
+    const activeComplaintsCount = incidents.filter(i => i.status !== 'Resolved').length;
+
+    return (
+      <div className="p-8 md:p-10 space-y-8 w-full max-w-[1450px] mx-auto">
+        {/* Header */}
+        <div>
+          <h2 className="text-3xl font-heading font-bold text-slate-900 tracking-tight">Safety Overview</h2>
+          <p className="text-slate-550 text-sm font-medium">Real-time operator behavior tracking, incident logs, and safety audits.</p>
+        </div>
+
+        {/* Safety Metrics Grid */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow">
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Expired Licenses</span>
+            <span className="text-2xl font-bold text-red-650 block mt-1">{expiredLicenseCount}</span>
+          </div>
+          <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow">
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Low Safety Scores (&lt;70)</span>
+            <span className="text-2xl font-bold text-amber-700 block mt-1">{lowSafetyScoreCount}</span>
+          </div>
+          <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow">
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Avg Safety Rating</span>
+            <span className="text-2xl font-bold text-slate-800 block mt-1">{avgSafetyScore}/100</span>
+          </div>
+          <div className="p-5 rounded-2xl border border-violet-100 bg-violet-50/70 shadow-sm hover:shadow-md transition-shadow">
+            <span className="text-[10px] text-violet-600 font-bold uppercase tracking-wider">Active Complaints</span>
+            <span className="text-2xl font-bold text-violet-755 block mt-1">{activeComplaintsCount}</span>
+          </div>
+        </div>
+
+        {/* Content columns */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left Column (1/3 Width) - Safety Circular Gauge */}
+          <div className="lg:col-span-1 flex flex-col gap-8">
+            <div className="premium-card-slate p-8 rounded-2xl flex flex-col items-center justify-between hover:shadow-xl hover:shadow-emerald-500/5 hover:-translate-y-0.5 transition-all duration-300">
+              <div className="text-left w-full">
+                <h3 className="text-slate-900 font-heading font-bold text-base leading-tight">Fleet Safety Rating</h3>
+                <span className="text-slate-455 text-xs mt-1 block">Average driver compliance score.</span>
+              </div>
+
+              <div className="relative flex items-center justify-center my-6 h-44 w-44">
+                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                  <circle 
+                    cx="50" 
+                    cy="50" 
+                    r="40" 
+                    className="stroke-slate-100" 
+                    strokeWidth="8" 
+                    fill="transparent" 
+                  />
+                  <circle 
+                    cx="50" 
+                    cy="50" 
+                    r="40" 
+                    className={`transition-all duration-1000 ease-out ${
+                      avgSafetyScore >= 85 
+                        ? 'stroke-emerald-500' 
+                        : avgSafetyScore >= 70 
+                        ? 'stroke-amber-500' 
+                        : 'stroke-red-500'
+                    }`}
+                    strokeWidth="9" 
+                    fill="transparent" 
+                    strokeDasharray="251.2"
+                    strokeDashoffset={251.2 - (251.2 * avgSafetyScore) / 100}
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <div className="absolute text-center">
+                  <h2 className="text-4xl font-heading font-bold text-slate-900 leading-none font-mono">{avgSafetyScore}%</h2>
+                  <span className="text-[10px] uppercase tracking-wider text-slate-455 font-bold block mt-1">Safety Score</span>
+                </div>
+              </div>
+
+              <div className="w-full grid grid-cols-2 gap-4 border-t border-slate-100 pt-6">
+                <div className="text-center bg-white border border-slate-150 p-3 rounded-xl shadow-sm">
+                  <span className="text-[9.5px] text-slate-450 uppercase tracking-wide font-bold block">Total Drivers</span>
+                  <span className="text-lg font-bold text-slate-800 mt-1 block font-mono">{drivers.length}</span>
+                </div>
+                <div className="text-center bg-white border border-slate-150 p-3 rounded-xl shadow-sm">
+                  <span className="text-[9.5px] text-slate-450 uppercase tracking-wide font-bold block">Alerts Triggered</span>
+                  <span className="text-lg font-bold text-slate-850 mt-1 block font-mono">{lowSafetyScoreCount}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column (2/3 Width) - Recent Critical Safety violations */}
+          <div className="lg:col-span-2 bg-white border border-slate-200/80 p-6 rounded-2xl shadow-sm space-y-4">
+            <div>
+              <h3 className="text-slate-900 font-heading font-bold text-lg">Critical Safety Infractions</h3>
+              <p className="text-xs text-slate-450 mt-0.5 font-medium">Recent high or critical severity driver behavior flags.</p>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-650">
+                <thead className="text-slate-455 uppercase tracking-wider border-b border-slate-100 font-bold">
+                  <tr>
+                    <th className="py-2.5">Date</th>
+                    <th className="py-2.5">Driver</th>
+                    <th className="py-2.5">Infraction</th>
+                    <th className="py-2.5">Severity</th>
+                    <th className="py-2.5 text-right">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                  {incidents.filter(i => i.severity === 'Critical' || i.severity === 'High').slice(0, 5).map((inc) => (
+                    <tr key={inc.id} className="hover:bg-slate-50/50">
+                      <td className="py-3 font-mono">{inc.date}</td>
+                      <td className="py-3 text-slate-900 font-bold">{inc.driverName}</td>
+                      <td className="py-3">
+                        <div className="font-semibold text-slate-850">{inc.category}</div>
+                        <div className="text-[9.5px] text-slate-400 font-normal truncate max-w-[200px]" title={inc.description}>
+                          {inc.description}
+                        </div>
+                      </td>
+                      <td className="py-3">
+                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border ${
+                          inc.severity === 'Critical'
+                            ? 'bg-red-50 text-red-650 border-red-100'
+                            : 'bg-amber-50 text-amber-600 border-amber-100'
+                        }`}>
+                          {inc.severity}
+                        </span>
+                      </td>
+                      <td className="py-3 text-right">
+                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border ${
+                          inc.status === 'Resolved'
+                            ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                            : inc.status === 'Investigating'
+                            ? 'bg-indigo-50 text-indigo-600 border-indigo-100'
+                            : 'bg-red-55 text-red-600 border-red-200'
+                        }`}>
+                          {inc.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                  {incidents.filter(i => i.severity === 'Critical' || i.severity === 'High').length === 0 && (
+                    <tr>
+                      <td colSpan="5" className="py-8 text-center text-slate-400 font-normal">No critical safety infractions registered.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -278,6 +438,59 @@ export default function Dashboard() {
               <div className="text-center bg-white border border-slate-150 p-3 rounded-xl shadow-sm">
                 <span className="text-[9.5px] text-slate-450 uppercase tracking-wide font-bold block">On Duty Drivers</span>
                 <span className="text-lg font-bold text-slate-800 mt-1 block font-mono">{driversOnDutyCount}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Fleet Safety Score Card */}
+          <div className="premium-card-slate p-8 rounded-2xl flex flex-col items-center justify-between hover:shadow-xl hover:shadow-emerald-500/5 hover:-translate-y-0.5 transition-all duration-300">
+            <div className="text-left w-full">
+              <h3 className="text-slate-900 font-heading font-bold text-base leading-tight">Fleet Safety Rating</h3>
+              <span className="text-slate-455 text-xs mt-1 block">Average driver compliance score.</span>
+            </div>
+
+            <div className="relative flex items-center justify-center my-6 h-44 w-44">
+              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                <circle 
+                  cx="50" 
+                  cy="50" 
+                  r="40" 
+                  className="stroke-slate-100" 
+                  strokeWidth="8" 
+                  fill="transparent" 
+                />
+                <circle 
+                  cx="50" 
+                  cy="50" 
+                  r="40" 
+                  className={`transition-all duration-1000 ease-out ${
+                    avgSafetyScore >= 85 
+                      ? 'stroke-emerald-500' 
+                      : avgSafetyScore >= 70 
+                      ? 'stroke-amber-500' 
+                      : 'stroke-red-500'
+                  }`}
+                  strokeWidth="9" 
+                  fill="transparent" 
+                  strokeDasharray="251.2"
+                  strokeDashoffset={251.2 - (251.2 * avgSafetyScore) / 100}
+                  strokeLinecap="round"
+                />
+              </svg>
+              <div className="absolute text-center">
+                <h2 className="text-4xl font-heading font-bold text-slate-900 leading-none font-mono">{avgSafetyScore}%</h2>
+                <span className="text-[10px] uppercase tracking-wider text-slate-455 font-bold block mt-1">Safety Score</span>
+              </div>
+            </div>
+
+            <div className="w-full grid grid-cols-2 gap-4 border-t border-slate-100 pt-6">
+              <div className="text-center bg-white border border-slate-150 p-3 rounded-xl shadow-sm">
+                <span className="text-[9.5px] text-slate-450 uppercase tracking-wide font-bold block">Total Drivers</span>
+                <span className="text-lg font-bold text-slate-800 mt-1 block font-mono">{drivers.length}</span>
+              </div>
+              <div className="text-center bg-white border border-slate-150 p-3 rounded-xl shadow-sm">
+                <span className="text-[9.5px] text-slate-450 uppercase tracking-wide font-bold block">Alerts Triggered</span>
+                <span className="text-lg font-bold text-slate-850 mt-1 block font-mono">{lowSafetyScoreCount}</span>
               </div>
             </div>
           </div>
