@@ -18,21 +18,22 @@ export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [userRole, setUserRole] = useState(null);
   const [loading, setLoading] = useState(true);
-  const isDemoMode = false; // Always false to enforce live Firebase DB
+  const isDemoMode = false; // Always false — pure Firebase mode
 
   useEffect(() => {
-    // Keep clean Firebase Auth listener
+    // Clear any stale demo mode flags from previous sessions
+    localStorage.removeItem('transitops_demo_mode');
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         try {
           const docRef = doc(db, 'users', user.uid);
           const docSnap = await getDoc(docRef);
-          
           if (docSnap.exists()) {
             setCurrentUser(user);
             setUserRole(docSnap.data().role);
           } else {
-            // Default fallback if doc missing (auto-create as Manager or Driver)
+            // Auto-create Firestore role document if missing
             let defaultRole = 'Driver';
             if (user.email.includes('manager') || user.email.includes('admin') || user.email.includes('devkamani9313')) {
               defaultRole = 'Manager';
@@ -85,11 +86,15 @@ export function AuthProvider({ children }) {
   };
 
   const loginAsRole = async (roleName) => {
-    // Left as empty dummy for backward compatibility in components
+    // One-click demo login disabled in production Firebase mode
     console.warn("One-Click demo login is disabled in Production Mode.");
   };
 
   const logout = async () => {
+    localStorage.removeItem('transitops_user_session');
+    localStorage.removeItem('transitops_demo_mode');
+    setCurrentUser(null);
+    setUserRole(null);
     await signOut(auth);
   };
 
@@ -105,7 +110,6 @@ export function AuthProvider({ children }) {
   };
 
   const toggleMode = () => {
-    // Disabled in production mode
     console.warn("Environment toggle is disabled in Production Mode.");
   };
 

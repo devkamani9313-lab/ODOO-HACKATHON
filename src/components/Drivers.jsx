@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Trash, X, Check, Warning, Phone, Cardholder, User } from '@phosphor-icons/react';
 import { getDrivers, addDriver, updateDriver, deleteDriver, isLicenseExpired, logSafetyIncident } from '../services/dataManager';
 import { useAuth } from '../context/AuthContext';
+import { initializeApp, deleteApp } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { getFirestore, doc, setDoc } from 'firebase/firestore';
+import { firebaseConfig } from '../firebase';
 
 export default function Drivers() {
   const { isDemoMode, userRole } = useAuth();
@@ -137,12 +141,37 @@ export default function Drivers() {
       if (editMode) {
         await updateDriver(isDemoMode, activeDriverId, driverData);
       } else {
-        await addDriver(isDemoMode, driverData);
+        if (!isDemoMode) {
+          // Firebase mode: create real Auth user without signing out manager
+          const tempApp = initializeApp(firebaseConfig, 'StaffRegistration_' + Date.now());
+          try {
+            const tempAuth = getAuth(tempApp);
+            const tempDb = getFirestore(tempApp);
+            const cred = await createUserWithEmailAndPassword(tempAuth, driverData.email, driverData.password);
+            // Save role to Firestore
+            await setDoc(doc(tempDb, 'users', cred.user.uid), {
+              uid: cred.user.uid,
+              email: driverData.email,
+              role: driverData.role
+            });
+            // Save full profile with Firebase UID
+            await addDriver(isDemoMode, { ...driverData, uid: cred.user.uid });
+          } finally {
+            await deleteApp(tempApp);
+          }
+        } else {
+          // Demo mode: just save to localStorage
+          await addDriver(isDemoMode, driverData);
+        }
       }
       setModalOpen(false);
       loadDrivers();
     } catch (err) {
-      setError(err.message || 'An error occurred while saving.');
+      if (err.code === 'auth/email-already-in-use') {
+        setError('This email is already registered. Use a different email.');
+      } else {
+        setError(err.message || 'An error occurred while saving.');
+      }
     }
   };
 
