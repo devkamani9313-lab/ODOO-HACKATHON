@@ -9,6 +9,7 @@ import Maintenance from './components/Maintenance';
 import Expenses from './components/Expenses';
 import Reports from './components/Reports';
 import Incidents from './components/Incidents';
+import AIAssistant from './components/AIAssistant';
 import { 
   Sparkle, 
   CaretRight, 
@@ -730,6 +731,7 @@ function AppContent() {
         <main className="flex-grow overflow-y-auto bg-gray-50/50">
           {renderActiveTab()}
         </main>
+        <AIAssistant />
       </div>
     </div>
   );
