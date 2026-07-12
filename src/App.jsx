@@ -9,6 +9,7 @@ import Maintenance from './components/Maintenance';
 import Expenses from './components/Expenses';
 import Reports from './components/Reports';
 import Incidents from './components/Incidents';
+import DriverTripsLog from './components/DriverTripsLog';
 import AIAssistant from './components/AIAssistant';
 import { 
   Sparkle, 
@@ -103,6 +104,8 @@ function AppContent() {
         return userRole === 'Manager' ? <Drivers /> : <AccessDenied />;
       case 'trips':
         return (userRole === 'Manager' || userRole === 'Driver') ? <Trips /> : <AccessDenied />;
+      case 'tripslog':
+        return userRole === 'Driver' ? <DriverTripsLog /> : <AccessDenied />;
       case 'maintenance':
         return userRole === 'Manager' ? <Maintenance /> : <AccessDenied />;
       case 'expenses':
