@@ -20,6 +20,7 @@ import {
 } from '@phosphor-icons/react';
 import { getVehicles, getDrivers, getTrips, getFuelLogs, getExpenses, getIncidents } from '../services/dataManager';
 import { useAuth } from '../context/AuthContext';
+import { FleetManagerCharts, DriverCharts, FinancialAnalystCharts, SafetyOfficerCharts } from './DashboardCharts';
 
 export default function Dashboard() {
   const { isDemoMode, userRole, currentUser } = useAuth();
@@ -497,6 +498,9 @@ export default function Dashboard() {
             </table>
           </div>
         </div>
+
+        {/* Driver Analytics Charts */}
+        <DriverCharts />
       </div>
     );
   }
@@ -650,6 +654,9 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        {/* Safety Officer Analytics Charts */}
+        <SafetyOfficerCharts />
       </div>
     );
   }
@@ -771,8 +778,17 @@ export default function Dashboard() {
             <span className="text-[11px] text-slate-400 font-semibold block mt-1">Dispatched / Drafted</span>
           </div>
         </div>
-
       </div>
+
+      {/* Fleet Manager Analytics Visualizations */}
+      {(userRole === 'Manager' || !userRole || userRole === 'Fleet Manager') && (
+        <FleetManagerCharts vehicles={vehicles} />
+      )}
+
+      {/* Financial Analyst Analytics Visualizations */}
+      {(userRole === 'Financial Analyst' || userRole === 'Manager') && (
+        <FinancialAnalystCharts />
+      )}
 
       {/* Main Panel Grid: Balanced double columns */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
