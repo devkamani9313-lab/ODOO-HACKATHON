@@ -40,7 +40,9 @@ import {
   Bell,
   CurrencyInr,
   CaretDown,
-  Quotes
+  Quotes,
+  Leaf,
+  Coins
 } from '@phosphor-icons/react';
 
 
@@ -71,6 +73,45 @@ function AppContent() {
       setActiveTab('dashboard');
     } catch (err) {
       setError(err.message || 'Login failed. Please check your credentials.');
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleQuickLogin = async (roleName) => {
+    setError('');
+    setFormLoading(true);
+    let email = '';
+    const password = 'password123';
+    let targetRole = 'Manager';
+
+    if (roleName === 'Fleet Manager') {
+      email = 'manager@transitops.com';
+      targetRole = 'Manager';
+    } else if (roleName === 'Driver') {
+      email = 'driver@transitops.com';
+      targetRole = 'Driver';
+    } else if (roleName === 'Safety Officer') {
+      email = 'safety@transitops.com';
+      targetRole = 'Safety Officer';
+    } else if (roleName === 'Financial Analyst') {
+      email = 'finance@transitops.com';
+      targetRole = 'Financial Analyst';
+    }
+
+    try {
+      await login(email, password);
+      setView('app');
+      setActiveTab('dashboard');
+    } catch (err) {
+      // Auto register on firebase if account not present
+      try {
+        await signup(email, password, targetRole);
+        setView('app');
+        setActiveTab('dashboard');
+      } catch (signupErr) {
+        setError(`Quick login failed: ${signupErr.message}`);
+      }
     } finally {
       setFormLoading(false);
     }
@@ -615,83 +656,189 @@ function AppContent() {
   // --- VIEW 2: LOGIN / GATEWAY PAGE ---
   if (view === 'login') {
     return (
-      <div className="min-h-screen bg-[#f8fafc] text-[#1e293b] flex items-center justify-center p-6 relative">
-        {/* Decorative background orbs */}
-        <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-violet-200/30 rounded-full blur-[120px] pointer-events-none" />
-        <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-cyan-200/25 rounded-full blur-[100px] pointer-events-none" />
+      <div className="min-h-screen grid grid-cols-1 lg:grid-cols-12 bg-[#060611] text-white overflow-hidden relative selection:bg-violet-500/20">
+        
+        {/* Left Side: Gorgeous SaaS-style dashboard bento overview */}
+        <div className="hidden lg:flex lg:col-span-6 flex-col justify-between p-16 bg-[#0b0b1f] border-r border-white/[0.06] relative overflow-hidden min-h-screen">
+          {/* Floating Glow Orbs */}
+          <div className="absolute top-[-20%] left-[-20%] w-[450px] h-[450px] bg-violet-600/15 rounded-full blur-[130px] pointer-events-none" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[400px] h-[400px] bg-cyan-500/10 rounded-full blur-[100px] pointer-events-none" />
+          <div className="absolute inset-0 dot-grid opacity-25 pointer-events-none" />
 
-        <div className="w-full max-w-md bg-white border border-slate-200/80 p-8 rounded-3xl shadow-2xl backdrop-blur-lg relative z-10 space-y-6">
-          <div className="flex items-center justify-between">
+          {/* Logo Header */}
+          <div className="flex items-center gap-2.5 relative z-10">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
+              <Sparkle size={20} weight="fill" className="text-white" />
+            </div>
+            <span className="font-heading font-bold text-xl tracking-tight text-white">TransitOps</span>
+          </div>
+
+          {/* Bento Preview Items */}
+          <div className="space-y-8 my-auto relative z-10">
+            <div className="space-y-3">
+              <span className="text-[10px] text-violet-300 font-bold uppercase tracking-[0.2em] bg-violet-500/15 border border-violet-500/25 px-3.5 py-1 rounded-full w-fit block">
+                Platform Workspaces
+              </span>
+              <h2 className="text-4xl lg:text-5xl font-heading font-bold tracking-tight text-white leading-tight">
+                One Unified Command Center. <br />
+                <span className="gradient-text-animated">Four Role Workspaces.</span>
+              </h2>
+              <p className="text-gray-400 text-sm max-w-md leading-relaxed">
+                Log in manually or select any role below to instantly load its operational dashboard.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 max-w-md pt-2">
+              {[
+                { name: 'Fleet Manager', desc: 'Asset registry, live dispatches & utilization trends', icon: Truck, color: 'border-violet-500/20 bg-violet-500/5 text-violet-300' },
+                { name: 'Driver Hub', desc: 'Carbon offset metrics, weather routing & PDF reports', icon: Leaf, color: 'border-emerald-500/20 bg-emerald-500/5 text-emerald-300' },
+                { name: 'Safety Officer', desc: 'Compliance status, licenses & incident logs', icon: ShieldCheck, color: 'border-red-500/20 bg-red-500/5 text-red-300' },
+                { name: 'Financial Analyst', desc: 'Profit margins, expenditures & per-vehicle ROI auditing', icon: Coins, color: 'border-amber-500/20 bg-amber-500/5 text-amber-300' }
+              ].map((item, idx) => {
+                const Icon = item.icon;
+                return (
+                  <div key={idx} className={`p-4 rounded-2xl border flex items-start gap-4.5 backdrop-blur-sm ${item.color}`}>
+                    <div className="h-10 w-10 rounded-xl bg-white/10 flex items-center justify-center flex-shrink-0 border border-white/10">
+                      <Icon size={20} weight="fill" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-white leading-tight">{item.name}</h4>
+                      <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">{item.desc}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Footer Metadata */}
+          <div className="text-xs text-gray-500 font-mono relative z-10 flex items-center justify-between">
+            <span>TransitOps v2.0</span>
+            <span>Live Sync Mode</span>
+          </div>
+        </div>
+
+        {/* Right Side: Clean spacious login view with bento demo quick access */}
+        <div className="lg:col-span-6 flex flex-col justify-between p-16 bg-[#f8fafc] text-[#1e293b] relative overflow-y-auto min-h-screen">
+          {/* Background mesh for right side */}
+          <div className="absolute top-1/4 left-1/4 w-[450px] h-[450px] bg-violet-100/40 rounded-full blur-[110px] pointer-events-none" />
+          <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-cyan-100/30 rounded-full blur-[90px] pointer-events-none" />
+
+          {/* Header */}
+          <div className="flex items-center justify-between w-full max-w-[560px] mx-auto relative z-10">
             <button 
               onClick={() => setView('landing')}
-              className="flex items-center gap-1.5 text-violet-600 hover:text-violet-750 font-bold text-xs transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 text-violet-655 hover:text-violet-750 font-bold text-sm transition-colors cursor-pointer"
             >
-              <ArrowLeft size={14} />
-              <span>Back</span>
+              <ArrowLeft size={16} />
+              <span>Back to Home</span>
             </button>
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-              Live Database Mode
+            <span className="text-xs text-slate-455 font-bold uppercase tracking-widest font-mono">
+              Live Firebase DB
             </span>
           </div>
 
-          <div className="text-center space-y-2">
-            <div className="mx-auto h-11 w-11 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-650 flex items-center justify-center shadow-lg shadow-violet-500/20 mb-2">
-              <Sparkle size={22} weight="fill" className="text-white" />
+          {/* Main Card Wrapper */}
+          <div className="w-full max-w-[560px] mx-auto my-auto bg-white border border-slate-200/80 p-10 md:p-12 rounded-[32px] shadow-2xl backdrop-blur-md relative z-10 space-y-8">
+            <div className="space-y-3">
+              <h2 className="text-3xl font-heading font-extrabold text-slate-900 tracking-tight">
+                Access Operations Deck
+              </h2>
+              <p className="text-sm text-slate-500 font-medium leading-relaxed">
+                Log in manually using your credentials, or select a workspace below for instant quick access.
+              </p>
             </div>
-            <h2 className="text-2xl font-heading font-bold text-slate-900 tracking-tight">
-              Welcome Back
-            </h2>
-            <p className="text-xs text-slate-500">
-              Log in to access your operations dashboard.
-            </p>
+
+            {error && (
+              <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-sm font-semibold text-red-650 text-center">
+                {error}
+              </div>
+            )}
+
+            {/* Manual Form */}
+            <form onSubmit={handleLoginSubmit} className="space-y-5 text-sm">
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Email Address</label>
+                <div className="relative">
+                  <input
+                    type="email"
+                    required
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    placeholder="manager@transitops.com"
+                    className="w-full bg-slate-55 border border-slate-200 rounded-2xl px-5 py-4 pl-12 text-base text-slate-900 focus:outline-none focus:border-violet-500 focus:bg-white font-semibold shadow-sm"
+                  />
+                  <EnvelopeSimple size={20} className="absolute left-4 top-[18px] text-gray-400" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Password</label>
+                <div className="relative">
+                  <input
+                    type="password"
+                    required
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full bg-slate-55 border border-slate-200 rounded-2xl px-5 py-4 pl-12 text-base text-slate-900 focus:outline-none focus:border-violet-500 focus:bg-white font-semibold shadow-sm"
+                  />
+                  <LockSimple size={20} className="absolute left-4 top-[18px] text-gray-400" />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={formLoading}
+                className="w-full py-4 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-650 hover:from-violet-500 hover:to-indigo-550 text-white font-bold text-base transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer shadow-lg shadow-violet-600/15"
+              >
+                {formLoading ? 'Authenticating...' : 'Sign In'}
+              </button>
+            </form>
+
+            {/* Quick Demo Access Divider */}
+            <div className="relative flex py-3 items-center">
+              <div className="flex-grow border-t border-slate-200"></div>
+              <span className="flex-shrink mx-4 text-xs text-slate-400 font-bold uppercase tracking-widest bg-white px-2">
+                One-Click Quick Access
+              </span>
+              <div className="flex-grow border-t border-slate-200"></div>
+            </div>
+
+            {/* Bento Quick Demo Access Grid */}
+            <div className="grid grid-cols-2 gap-4.5">
+              {[
+                { name: 'Fleet Manager', id: 'Fleet Manager', icon: Truck, color: 'hover:border-violet-300 hover:bg-violet-50/20 text-violet-750 bg-violet-500/[0.03] border-violet-500/10 shadow-sm' },
+                { name: 'Driver Hub', id: 'Driver', icon: Leaf, color: 'hover:border-emerald-300 hover:bg-emerald-50/20 text-emerald-750 bg-emerald-500/[0.03] border-emerald-500/10 shadow-sm' },
+                { name: 'Safety Officer', id: 'Safety Officer', icon: ShieldCheck, color: 'hover:border-red-300 hover:bg-red-50/20 text-red-750 bg-red-500/[0.03] border-red-500/10 shadow-sm' },
+                { name: 'Financial Analyst', id: 'Financial Analyst', icon: Coins, color: 'hover:border-amber-300 hover:bg-amber-50/20 text-amber-750 bg-emerald-500/[0.03] border-amber-500/10 shadow-sm' }
+              ].map((role) => {
+                const Icon = role.icon;
+                return (
+                  <button
+                    key={role.id}
+                    type="button"
+                    disabled={formLoading}
+                    onClick={() => handleQuickLogin(role.id)}
+                    className={`p-4.5 rounded-2xl border text-left flex items-center gap-4 transition-all duration-300 cursor-pointer disabled:opacity-50 ${role.color}`}
+                  >
+                    <div className="h-10 w-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center flex-shrink-0 shadow-md">
+                      <Icon size={20} weight="fill" />
+                    </div>
+                    <div>
+                      <span className="text-sm font-bold leading-tight block text-slate-800">{role.name}</span>
+                      <span className="text-xs text-slate-400 font-semibold block mt-1">Quick Launch</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          {error && (
-            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs font-semibold text-red-650 text-center">
-              {error}
-            </div>
-          )}
-
-          {/* SIGN IN FORM */}
-          <form onSubmit={handleLoginSubmit} className="space-y-4 text-xs">
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Email Address</label>
-              <div className="relative">
-                <input
-                  type="email"
-                  required
-                  value={loginEmail}
-                  onChange={(e) => setLoginEmail(e.target.value)}
-                  placeholder="manager@transitops.com"
-                  className="w-full bg-slate-55 border border-slate-200 rounded-xl px-4 py-3 pl-10 text-sm text-slate-900 focus:outline-none focus:border-violet-500 focus:bg-white"
-                />
-                <EnvelopeSimple size={18} className="absolute left-3.5 top-3.5 text-gray-400" />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Password</label>
-              <div className="relative">
-                <input
-                  type="password"
-                  required
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-slate-55 border border-slate-200 rounded-xl px-4 py-3 pl-10 text-sm text-slate-900 focus:outline-none focus:border-violet-500 focus:bg-white"
-                />
-                <LockSimple size={18} className="absolute left-3.5 top-3.5 text-gray-400" />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={formLoading}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-650 hover:from-violet-500 hover:to-indigo-550 text-white font-bold text-sm transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer shadow-md shadow-violet-600/10"
-            >
-              {formLoading ? 'Authenticating...' : 'Sign In'}
-            </button>
-          </form>
+          {/* Footer Copyright */}
+          <div className="text-center w-full max-w-md mx-auto text-slate-400 text-[10px] font-semibold mt-4">
+            © 2026 TransitOps. All rights reserved.
+          </div>
         </div>
       </div>
     );
@@ -704,19 +851,34 @@ function AppContent() {
       <div className="flex-grow flex flex-col h-screen overflow-hidden">
         {/* Top Header Navigation */}
         <header className="h-16 border-b border-slate-200/80 bg-white/70 backdrop-blur-md px-8 flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-bold px-3 py-1 rounded-xl bg-violet-50 text-violet-750 border border-violet-100 uppercase tracking-wide">
-              {userRole} Mode
-            </span>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200/60">
+              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider pl-2 pr-1.5 hidden xl:inline">Workspace View:</span>
+              {[
+                { id: 'Manager', label: 'Fleet Manager' },
+                { id: 'Driver', label: 'Driver Hub' },
+                { id: 'Safety Officer', label: 'Safety Officer' },
+                { id: 'Financial Analyst', label: 'Financial Analyst' }
+              ].map(roleItem => {
+                const isActive = userRole === roleItem.id;
+                return (
+                  <button
+                    key={roleItem.id}
+                    onClick={() => setUserRole(roleItem.id)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 cursor-pointer ${
+                      isActive 
+                        ? 'bg-white text-slate-900 shadow-sm border border-slate-200/60' 
+                        : 'text-slate-555 hover:text-slate-900 hover:bg-white/40'
+                    }`}
+                  >
+                    {roleItem.label}
+                  </button>
+                );
+              })}
+            </div>
             <span className="text-xs text-slate-400 font-mono hidden md:inline">
               ({currentUser?.email})
             </span>
-            <button
-              onClick={() => setUserRole(prev => prev === 'Manager' ? 'Driver' : 'Manager')}
-              className="text-[10px] bg-violet-100 hover:bg-violet-200 text-violet-700 font-bold px-2.5 py-1 rounded-lg transition-colors cursor-pointer active:scale-95 border border-violet-200/50"
-            >
-              Toggle Role (Dev Tools)
-            </button>
           </div>
           
           <button
