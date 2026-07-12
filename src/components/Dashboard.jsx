@@ -21,6 +21,7 @@ import {
 import { getVehicles, getDrivers, getTrips, getFuelLogs, getExpenses, getIncidents, getMaintenanceLogs } from '../services/dataManager';
 import { useAuth } from '../context/AuthContext';
 import { FleetManagerCharts, DriverCharts, FinancialAnalystCharts, SafetyOfficerCharts } from './DashboardCharts';
+import { generateTripReportPDF } from '../utils/generateTripReportPDF';
 
 export default function Dashboard() {
   const { isDemoMode, userRole, currentUser } = useAuth();
@@ -34,6 +35,17 @@ export default function Dashboard() {
   const [incidents, setIncidents] = useState([]);
   const [maintenanceLogs, setMaintenanceLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [reportToast, setReportToast] = useState(null);
+
+  const handleGenerateTripReport = (trip) => {
+    try {
+      const vehicle = vehicles.find(v => v.name === trip.vehicleName || v.id === trip.vehicleId) || {};
+      generateTripReportPDF(trip, currentUser || {}, vehicle);
+    } catch (err) {
+      setReportToast('Unable to generate report.');
+      setTimeout(() => setReportToast(null), 3500);
+    }
+  };
 
   // Filters State
   const [filterType, setFilterType] = useState('All');
@@ -452,6 +464,7 @@ export default function Dashboard() {
                   <th className="py-3 px-4">Fuel Burned</th>
                   <th className="py-3 px-4">CO2 Output</th>
                   <th className="py-3 px-4 text-right">Rating</th>
+                  <th className="py-3 px-4 text-right">Report</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
@@ -489,12 +502,24 @@ export default function Dashboard() {
                           </span>
                         )}
                       </td>
+                      <td className="py-3 px-4 text-right">
+                        {trip.status === 'Completed' ? (
+                          <button
+                            type="button"
+                            aria-label={`Generate Trip Report (PDF) for trip from ${trip.source} to ${trip.destination}`}
+                            onClick={() => handleGenerateTripReport(trip)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-heading font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200 shadow-sm hover:shadow transition-all duration-300 cursor-pointer active:scale-95"
+                          >
+                            Generate Trip Report (PDF)
+                          </button>
+                        ) : null}
+                      </td>
                     </tr>
                   );
                 })}
                 {driverTrips.length === 0 && (
                   <tr>
-                    <td colSpan="6" className="py-12 px-4 text-center text-xs text-slate-455 font-medium bg-white">No routes logged. Get dispatched to see your carbon metrics!</td>
+                    <td colSpan="7" className="py-12 px-4 text-center text-xs text-slate-455 font-medium bg-white">No routes logged. Get dispatched to see your carbon metrics!</td>
                   </tr>
                 )}
               </tbody>
@@ -504,6 +529,13 @@ export default function Dashboard() {
 
         {/* Driver Analytics Charts */}
         <DriverCharts trips={trips} />
+
+        {/* Error Toast Notification */}
+        {reportToast && (
+          <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-lg border border-slate-700 text-xs font-bold flex items-center gap-2 animate-fade-in">
+            <span>{reportToast}</span>
+          </div>
+        )}
       </div>
     );
   }
