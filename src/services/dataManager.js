@@ -262,6 +262,13 @@ export const createTrip = async (isDemo, tripData) => {
     throw new Error('This vehicle is currently unavailable (Retired or In Shop).');
   }
 
+  // Ensure vehicle is not under active maintenance log
+  const logs = await getMaintenanceLogs(isDemo);
+  const activeMaintenance = logs.some(log => log.vehicleId === tripData.vehicleId && log.status === 'Active');
+  if (activeMaintenance) {
+    throw new Error('Selected vehicle is currently under maintenance.');
+  }
+
   // Rule 2: Driver suspended or expired license
   if (driver.status === 'Suspended') {
     throw new Error('Selected driver is Suspended.');

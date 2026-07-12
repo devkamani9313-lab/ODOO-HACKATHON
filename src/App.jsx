@@ -42,7 +42,7 @@ import {
 
 
 function AppContent() {
-  const { currentUser, userRole, login, signup, loginAsRole, logout, isDemoMode, toggleMode } = useAuth();
+  const { currentUser, userRole, setUserRole, login, signup, loginAsRole, logout, isDemoMode, toggleMode } = useAuth();
   
   // Navigation Routing States
   const [view, setView] = useState('landing'); // landing, login, signup, app
@@ -704,6 +704,12 @@ function AppContent() {
             <span className="text-xs text-slate-400 font-mono hidden md:inline">
               ({currentUser?.email})
             </span>
+            <button
+              onClick={() => setUserRole(prev => prev === 'Manager' ? 'Driver' : 'Manager')}
+              className="text-[10px] bg-violet-100 hover:bg-violet-200 text-violet-700 font-bold px-2.5 py-1 rounded-lg transition-colors cursor-pointer active:scale-95 border border-violet-200/50"
+            >
+              Toggle Role (Dev Tools)
+            </button>
           </div>
           
           <button

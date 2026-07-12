@@ -27,14 +27,13 @@ export function AuthProvider({ children }) {
         try {
           const docRef = doc(db, 'users', user.uid);
           const docSnap = await getDoc(docRef);
-          
           if (docSnap.exists()) {
             setCurrentUser(user);
             setUserRole(docSnap.data().role);
           } else {
             // Default fallback if doc missing (auto-create as Manager or Driver)
             let defaultRole = 'Driver';
-            if (user.email.includes('manager') || user.email.includes('admin') || user.email.includes('devkamani9313')) {
+            if (user.email.includes('manager') || user.email.includes('admin') || user.email.includes('devkamani9313') || user.email.includes('abc') || user.email.includes('jay')) {
               defaultRole = 'Manager';
             }
             await setDoc(docRef, {
@@ -112,6 +111,7 @@ export function AuthProvider({ children }) {
   const value = {
     currentUser,
     userRole,
+    setUserRole,
     loading,
     isDemoMode,
     login,
