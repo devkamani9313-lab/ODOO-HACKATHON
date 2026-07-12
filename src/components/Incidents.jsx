@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 
 export default function Incidents() {
   const { isDemoMode, userRole } = useAuth();
-  
+
   const [drivers, setDrivers] = useState([]);
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -29,7 +29,7 @@ export default function Incidents() {
       ]);
       setDrivers(dList);
       setIncidents(iList);
-      
+
       if (dList.length > 0 && !incDriverId) {
         setIncDriverId(dList[0].id);
       }
@@ -72,7 +72,7 @@ export default function Incidents() {
       setIncSuccess(true);
       setIncDesc('');
       await loadData();
-      
+
       // Auto fade-out success notification
       setTimeout(() => {
         setIncSuccess(false);
@@ -97,7 +97,7 @@ export default function Incidents() {
     if (!d.licenseExpiryDate) return true;
     return new Date(d.licenseExpiryDate) < new Date();
   }).length;
-  
+
   const lowSafetyScoreCount = drivers.filter(d => d.safetyScore < 70).length;
   const avgSafetyScore = drivers.length > 0
     ? Math.round(drivers.reduce((sum, d) => sum + Number(d.safetyScore || 0), 0) / drivers.length)
@@ -286,26 +286,24 @@ export default function Incidents() {
                       </div>
                     </td>
                     <td className="py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border ${
-                        inc.severity === 'Critical'
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border ${inc.severity === 'Critical'
                           ? 'bg-red-50 text-red-650 border-red-100'
                           : inc.severity === 'High'
-                          ? 'bg-amber-50 text-amber-600 border-amber-100'
-                          : inc.severity === 'Medium'
-                          ? 'bg-violet-50 text-violet-600 border-violet-100'
-                          : 'bg-slate-100 text-slate-600 border-slate-200'
-                      }`}>
+                            ? 'bg-amber-50 text-amber-600 border-amber-100'
+                            : inc.severity === 'Medium'
+                              ? 'bg-violet-50 text-violet-600 border-violet-100'
+                              : 'bg-slate-100 text-slate-600 border-slate-200'
+                        }`}>
                         {inc.severity}
                       </span>
                     </td>
                     <td className="py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border ${
-                        inc.status === 'Resolved'
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border ${inc.status === 'Resolved'
                           ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
                           : inc.status === 'Investigating'
-                          ? 'bg-indigo-50 text-indigo-600 border-indigo-100'
-                          : 'bg-red-55 text-red-600 border-red-200'
-                      }`}>
+                            ? 'bg-indigo-50 text-indigo-600 border-indigo-100'
+                            : 'bg-red-55 text-red-600 border-red-200'
+                        }`}>
                         {inc.status}
                       </span>
                     </td>

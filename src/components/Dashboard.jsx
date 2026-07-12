@@ -18,7 +18,7 @@ import {
   Globe,
   Lightbulb
 } from '@phosphor-icons/react';
-import { getVehicles, getDrivers, getTrips, getFuelLogs, getExpenses, getIncidents } from '../services/dataManager';
+import { getVehicles, getDrivers, getTrips, getFuelLogs, getExpenses, getIncidents, getMaintenanceLogs } from '../services/dataManager';
 import { useAuth } from '../context/AuthContext';
 import { FleetManagerCharts, DriverCharts, FinancialAnalystCharts, SafetyOfficerCharts } from './DashboardCharts';
 
@@ -32,6 +32,7 @@ export default function Dashboard() {
   const [fuelLogs, setFuelLogs] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [incidents, setIncidents] = useState([]);
+  const [maintenanceLogs, setMaintenanceLogs] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Filters State
@@ -42,13 +43,14 @@ export default function Dashboard() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [v, d, t, f, e, inc] = await Promise.all([
+        const [v, d, t, f, e, inc, ml] = await Promise.all([
           getVehicles(isDemoMode),
           getDrivers(isDemoMode),
           getTrips(isDemoMode),
           getFuelLogs(isDemoMode),
           getExpenses(isDemoMode),
-          getIncidents(isDemoMode)
+          getIncidents(isDemoMode),
+          getMaintenanceLogs(isDemoMode)
         ]);
         setVehicles(v);
         setDrivers(d);
@@ -56,6 +58,7 @@ export default function Dashboard() {
         setFuelLogs(f);
         setExpenses(e);
         setIncidents(inc);
+        setMaintenanceLogs(ml);
       } catch (err) {
         console.error("Failed to load dashboard metrics", err);
       } finally {
@@ -500,7 +503,7 @@ export default function Dashboard() {
         </div>
 
         {/* Driver Analytics Charts */}
-        <DriverCharts />
+        <DriverCharts trips={trips} />
       </div>
     );
   }
@@ -656,7 +659,7 @@ export default function Dashboard() {
         </div>
 
         {/* Safety Officer Analytics Charts */}
-        <SafetyOfficerCharts />
+        <SafetyOfficerCharts incidents={incidents} drivers={drivers} />
       </div>
     );
   }
@@ -782,12 +785,12 @@ export default function Dashboard() {
 
       {/* Fleet Manager Analytics Visualizations */}
       {(userRole === 'Manager' || !userRole || userRole === 'Fleet Manager') && (
-        <FleetManagerCharts vehicles={vehicles} />
+        <FleetManagerCharts vehicles={vehicles} trips={trips} maintenanceLogs={maintenanceLogs} />
       )}
 
       {/* Financial Analyst Analytics Visualizations */}
       {(userRole === 'Financial Analyst' || userRole === 'Manager') && (
-        <FinancialAnalystCharts />
+        <FinancialAnalystCharts expenses={expenses} fuelLogs={fuelLogs} trips={trips} />
       )}
 
       {/* Main Panel Grid: Balanced double columns */}
