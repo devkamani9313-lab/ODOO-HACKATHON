@@ -502,4 +502,67 @@ export const closeMaintenance = async (isDemo, logId, endDate, finalCost) => {
   });
 };
 
+// Incidents & Driver Complaints Registry
+export const getIncidents = async (isDemo) => {
+  if (isDemo) {
+    return getLocalData('incidents', []);
+  }
+  const querySnapshot = await getDocs(collection(db, 'incidents'));
+  const list = [];
+  querySnapshot.forEach((doc) => {
+    list.push({ id: doc.id, ...doc.data() });
+  });
+  return list.sort((a, b) => new Date(b.date) - new Date(a.date));
+};
+
+export const addIncident = async (isDemo, incidentData) => {
+  const payload = {
+    ...incidentData,
+    status: incidentData.status || 'Active', // Active, Investigating, Resolved
+    createdAt: new Date().toISOString()
+  };
+
+  // Calculate safety score penalty
+  let penalty = 5;
+  if (payload.severity === 'Critical') penalty = 20;
+  else if (payload.severity === 'High') penalty = 15;
+  else if (payload.severity === 'Medium') penalty = 10;
+
+  // Retrieve driver and apply penalty
+  try {
+    const drivers = await getDrivers(isDemo);
+    const driver = drivers.find(d => d.id === payload.driverId);
+    if (driver) {
+      const currentScore = Number(driver.safetyScore !== undefined ? driver.safetyScore : 100);
+      const newScore = Math.max(0, currentScore - penalty);
+      await updateDriver(isDemo, payload.driverId, { safetyScore: newScore });
+    }
+  } catch (err) {
+    console.error("Failed to update driver safety score upon incident logging", err);
+  }
+
+  if (isDemo) {
+    const list = getLocalData('incidents', []);
+    const newLog = { id: 'inc_' + Date.now(), ...payload };
+    list.push(newLog);
+    saveLocalData('incidents', list);
+    return newLog;
+  }
+  const ref = await addDoc(collection(db, 'incidents'), payload);
+  return { id: ref.id, ...payload };
+};
+
+export const updateIncidentStatus = async (isDemo, incidentId, newStatus) => {
+  if (isDemo) {
+    const list = getLocalData('incidents', []);
+    const index = list.findIndex(i => i.id === incidentId);
+    if (index !== -1) {
+      list[index].status = newStatus;
+      saveLocalData('incidents', list);
+    }
+  } else {
+    await updateDoc(doc(db, 'incidents', incidentId), { status: newStatus });
+  }
+};
+
 

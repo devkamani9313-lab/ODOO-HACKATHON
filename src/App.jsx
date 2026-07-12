@@ -8,6 +8,7 @@ import Trips from './components/Trips';
 import Maintenance from './components/Maintenance';
 import Expenses from './components/Expenses';
 import Reports from './components/Reports';
+import Incidents from './components/Incidents';
 import { 
   Sparkle, 
   CaretRight, 
@@ -98,7 +99,7 @@ function AppContent() {
       case 'vehicles':
         return userRole === 'Manager' ? <Vehicles /> : <AccessDenied />;
       case 'drivers':
-        return (userRole === 'Manager' || userRole === 'Safety Officer') ? <Drivers /> : <AccessDenied />;
+        return userRole === 'Manager' ? <Drivers /> : <AccessDenied />;
       case 'trips':
         return (userRole === 'Manager' || userRole === 'Driver') ? <Trips /> : <AccessDenied />;
       case 'maintenance':
@@ -107,6 +108,8 @@ function AppContent() {
         return (userRole === 'Manager' || userRole === 'Financial Analyst' || userRole === 'Driver') ? <Expenses /> : <AccessDenied />;
       case 'reports':
         return (userRole === 'Manager' || userRole === 'Financial Analyst') ? <Reports /> : <AccessDenied />;
+      case 'incidents':
+        return (userRole === 'Manager' || userRole === 'Safety Officer') ? <Incidents /> : <AccessDenied />;
       default:
         return <Dashboard />;
     }
