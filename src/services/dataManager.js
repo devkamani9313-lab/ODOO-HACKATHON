@@ -372,13 +372,15 @@ export const completeTrip = async (isDemo, tripId, actualOdometer, fuelConsumed,
       list[index].status = 'Completed';
       list[index].actualOdometer = Number(actualOdometer);
       list[index].fuelConsumed = Number(fuelConsumed);
+      list[index].fuelCost = Number(fuelCost);
       saveLocalData('trips', list);
     }
   } else {
     await updateDoc(doc(db, 'trips', tripId), { 
       status: 'Completed',
       actualOdometer: Number(actualOdometer),
-      fuelConsumed: Number(fuelConsumed)
+      fuelConsumed: Number(fuelConsumed),
+      fuelCost: Number(fuelCost)
     });
   }
 

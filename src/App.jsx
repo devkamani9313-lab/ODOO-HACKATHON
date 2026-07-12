@@ -104,7 +104,7 @@ function AppContent() {
       case 'maintenance':
         return userRole === 'Manager' ? <Maintenance /> : <AccessDenied />;
       case 'expenses':
-        return (userRole === 'Manager' || userRole === 'Financial Analyst') ? <Expenses /> : <AccessDenied />;
+        return (userRole === 'Manager' || userRole === 'Financial Analyst' || userRole === 'Driver') ? <Expenses /> : <AccessDenied />;
       case 'reports':
         return (userRole === 'Manager' || userRole === 'Financial Analyst') ? <Reports /> : <AccessDenied />;
       default:

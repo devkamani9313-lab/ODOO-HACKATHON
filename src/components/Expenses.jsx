@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Plus, X, GasPump, Receipt, Check } from '@phosphor-icons/react';
 import { getExpenses, getFuelLogs, getVehicles, addFuelLog, addExpense } from '../services/dataManager';
 import { useAuth } from '../context/AuthContext';
-
 export default function Expenses() {
-  const { isDemoMode } = useAuth();
+  const { isDemoMode, userRole, currentUser } = useAuth();
+  const isDriver = userRole === 'Driver';
   
   const [expenses, setExpenses] = useState([]);
   const [fuelLogs, setFuelLogs] = useState([]);
@@ -36,8 +36,16 @@ export default function Expenses() {
         getFuelLogs(isDemoMode),
         getVehicles(isDemoMode)
       ]);
-      setExpenses(eList);
-      setFuelLogs(fList);
+
+      if (isDriver) {
+        // Drivers only see their own logged expenses
+        const driverEmail = currentUser?.email || '';
+        setExpenses(eList.filter(e => e.loggedBy === driverEmail));
+        setFuelLogs(fList.filter(f => f.loggedBy === driverEmail));
+      } else {
+        setExpenses(eList);
+        setFuelLogs(fList);
+      }
       setVehicles(vList);
     } catch (err) {
       console.error("Failed to load financial logs", err);
@@ -48,7 +56,7 @@ export default function Expenses() {
 
   useEffect(() => {
     loadData();
-  }, [isDemoMode]);
+  }, [isDemoMode, userRole, currentUser]);
 
   const activeVehicles = vehicles.filter(v => v.status !== 'Retired');
 
@@ -86,7 +94,8 @@ export default function Expenses() {
       vehicleName: vehicle ? `${vehicle.regNumber} (${vehicle.name})` : 'Unknown Vehicle',
       liters: Number(liters),
       cost: Number(fuelCost),
-      date: fuelDate
+      date: fuelDate,
+      loggedBy: currentUser?.email || 'System'
     };
 
     try {
@@ -98,7 +107,8 @@ export default function Expenses() {
         type: 'Fuel',
         cost: Number(fuelCost),
         date: fuelDate,
-        description: `Fuel refill: ${liters} Liters`
+        description: `Fuel refill: ${liters} Liters`,
+        loggedBy: currentUser?.email || 'System'
       });
 
       setFuelModalOpen(false);
@@ -124,7 +134,8 @@ export default function Expenses() {
       type: expType,
       cost: Number(expCost),
       date: expDate,
-      description: expDesc.trim()
+      description: expDesc.trim(),
+      loggedBy: currentUser?.email || 'System'
     };
 
     try {
@@ -149,8 +160,14 @@ export default function Expenses() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-heading font-bold text-slate-900 tracking-tight">Fuel & Expenses</h2>
-          <p className="text-slate-555 text-sm font-medium">Audit fuel logs, tolls, and maintenance expenditures across your fleet.</p>
+          <h2 className="text-3xl font-heading font-bold text-slate-900 tracking-tight">
+            {isDriver ? 'Log Trip Expenses' : 'Fuel & Expenses'}
+          </h2>
+          <p className="text-slate-555 text-sm font-medium">
+            {isDriver 
+              ? 'Record fuel refills, highway tolls, repairs, and other trip expenditures.' 
+              : 'Audit fuel logs, tolls, and maintenance expenditures across your fleet.'}
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -174,22 +191,30 @@ export default function Expenses() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Fuel Costs */}
         <div className="p-5 rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Total Fuel cost</span>
+          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+            {isDriver ? 'My Fuel Refills' : 'Total Fuel Cost'}
+          </span>
           <span className="text-2xl font-bold text-slate-800 block mt-1">₹{totalFuelCost.toLocaleString()}</span>
         </div>
         {/* Maintenance */}
         <div className="p-5 rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Maintenance costs</span>
+          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+            {isDriver ? 'My Repair Costs' : 'Maintenance Costs'}
+          </span>
           <span className="text-2xl font-bold text-slate-800 block mt-1">₹{totalMaintenanceCost.toLocaleString()}</span>
         </div>
         {/* Tolls & Toll gates */}
         <div className="p-5 rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tolls & Highway fees</span>
+          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+            {isDriver ? 'My Toll & Highway Fees' : 'Tolls & Highway Fees'}
+          </span>
           <span className="text-2xl font-bold text-slate-800 block mt-1">₹{totalTollsCost.toLocaleString()}</span>
         </div>
         {/* Consolidated costs */}
         <div className="p-5 rounded-2xl border border-violet-100 bg-violet-50 shadow-md shadow-violet-500/5">
-          <span className="text-[10px] text-violet-600 font-bold uppercase tracking-wider">Consolidated operational cost</span>
+          <span className="text-[10px] text-violet-600 font-bold uppercase tracking-wider">
+            {isDriver ? 'My Total Expenditures' : 'Consolidated Operational Cost'}
+          </span>
           <span className="text-2xl font-bold text-violet-755 block mt-1">₹{consolidatedCost.toLocaleString()}</span>
         </div>
       </div>
@@ -440,9 +465,13 @@ export default function Expenses() {
                     onChange={(e) => setExpType(e.target.value)}
                     className="w-full bg-slate-55 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-violet-500 focus:bg-white cursor-pointer font-semibold"
                   >
-                    <option value="Toll">Toll Fee</option>
+                    <option value="Toll">Toll Gate</option>
+                    <option value="Fuel">Diesel (Fuel)</option>
+                    <option value="Maintenance">Repair Cost</option>
+                    <option value="Meals">Food / Meals</option>
+                    <option value="Parking">Parking Fees</option>
                     <option value="Insurance">Insurance</option>
-                    <option value="Other">Other Operational</option>
+                    <option value="Other">Others</option>
                   </select>
                 </div>
               </div>

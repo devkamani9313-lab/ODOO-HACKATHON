@@ -22,7 +22,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
     { id: 'drivers', label: 'Staff Registry', icon: Users, roles: ['Manager', 'Safety Officer'] },
     { id: 'trips', label: 'Trip Management', icon: MapTrifold, roles: ['Manager', 'Driver'] },
     { id: 'maintenance', label: 'Maintenance Log', icon: Wrench, roles: ['Manager'] },
-    { id: 'expenses', label: 'Fuel & Expenses', icon: Receipt, roles: ['Manager', 'Financial Analyst'] },
+    { id: 'expenses', label: 'Fuel & Expenses', icon: Receipt, roles: ['Manager', 'Financial Analyst', 'Driver'] },
     { id: 'reports', label: 'Reports & ROI', icon: PresentationChart, roles: ['Manager', 'Financial Analyst'] }
   ];
 
