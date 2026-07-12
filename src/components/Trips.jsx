@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Check, X, Funnel, Warning, CaretLeft, CaretRight, ShieldCheck } from '@phosphor-icons/react';
 import { 
   getTrips, 
@@ -33,6 +33,18 @@ export default function Trips() {
   const [plannedDistance, setPlannedDistance] = useState('');
   const [revenue, setRevenue] = useState('');
   const [startOdometer, setStartOdometer] = useState('');
+
+  // Map Selector State
+  const [selectedSourceHub, setSelectedSourceHub] = useState(null);
+  const [selectedDestHub, setSelectedDestHub] = useState(null);
+  const mapInstance = useRef(null);
+  const markersRef = useRef({ source: null, dest: null, polyline: null });
+
+  // Autocomplete Suggestions State
+  const [sourceSuggestions, setSourceSuggestions] = useState([]);
+  const [destSuggestions, setDestSuggestions] = useState([]);
+  const [showSourceDropdown, setShowSourceDropdown] = useState(false);
+  const [showDestDropdown, setShowDestDropdown] = useState(false);
 
   // Wizard state
   const [wizardStep, setWizardStep] = useState(1);
@@ -114,9 +126,349 @@ export default function Trips() {
     setPlannedDistance('');
     setRevenue('');
     setStartOdometer('');
+    setSelectedSourceHub(null);
+    setSelectedDestHub(null);
+    setSourceSuggestions([]);
+    setDestSuggestions([]);
+    setShowSourceDropdown(false);
+    setShowDestDropdown(false);
     setWizardStep(1);
     setModalOpen(true);
   };
+
+  // Geocode: reverse location to suggestions list for Source input
+  useEffect(() => {
+    if (source.length < 3 || source === selectedSourceHub?.name) {
+      setSourceSuggestions([]);
+      return;
+    }
+    const delayDebounce = setTimeout(async () => {
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(source)}&limit=5`);
+        const data = await res.json();
+        setSourceSuggestions(data || []);
+      } catch (err) {
+        console.error("Geocoding failed", err);
+      }
+    }, 450);
+
+    return () => clearTimeout(delayDebounce);
+  }, [source, selectedSourceHub]);
+
+  // Geocode: reverse location to suggestions list for Destination input
+  useEffect(() => {
+    if (destination.length < 3 || destination === selectedDestHub?.name) {
+      setDestSuggestions([]);
+      return;
+    }
+    const delayDebounce = setTimeout(async () => {
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(destination)}&limit=5`);
+        const data = await res.json();
+        setDestSuggestions(data || []);
+      } catch (err) {
+        console.error("Geocoding failed", err);
+      }
+    }, 450);
+
+    return () => clearTimeout(delayDebounce);
+  }, [destination, selectedDestHub]);
+
+  const updateRoutePath = (lat1, lng1, lat2, lng2) => {
+    if (!mapInstance.current) return;
+
+    if (markersRef.current.polyline) {
+      mapInstance.current.removeLayer(markersRef.current.polyline);
+    }
+
+    const polyline = window.L.polyline([[lat1, lng1], [lat2, lng2]], {
+      color: '#8b5cf6',
+      weight: 3,
+      dashArray: '6, 6'
+    }).addTo(mapInstance.current);
+    markersRef.current.polyline = polyline;
+
+    // Zoom map to fit both markers
+    const bounds = window.L.latLngBounds([[lat1, lng1], [lat2, lng2]]);
+    mapInstance.current.fitBounds(bounds, { padding: [40, 40] });
+
+    // Haversine geodesic distance calculation
+    const R = 6371; // km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const calculatedDistance = Math.round(R * c);
+
+    setPlannedDistance(calculatedDistance.toString());
+    setRevenue((calculatedDistance * 18).toString()); // auto money charged calculation
+  };
+
+  const selectSourceSuggestion = (item) => {
+    const lat = parseFloat(item.lat);
+    const lng = parseFloat(item.lon);
+    const displayName = item.display_name.split(',')[0] + ', ' + (item.display_name.split(',')[1] || '').trim();
+    
+    setSource(displayName);
+    setSelectedSourceHub({ lat, lng, name: displayName });
+    setSourceSuggestions([]);
+    setShowSourceDropdown(false);
+
+    if (mapInstance.current) {
+      mapInstance.current.setView([lat, lng], 10);
+      
+      const sourceIcon = window.L.divIcon({
+        html: `<div class="w-6 h-6 rounded-full bg-violet-600 border border-white flex items-center justify-center shadow-lg shadow-violet-600/30">
+                 <div class="w-2.5 h-2.5 rounded-full bg-white animate-pulse"></div>
+               </div>`,
+        className: '',
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+      });
+
+      if (markersRef.current.source) {
+        markersRef.current.source.setLatLng([lat, lng]);
+      } else {
+        markersRef.current.source = window.L.marker([lat, lng], { icon: sourceIcon }).addTo(mapInstance.current);
+      }
+
+      if (selectedDestHub) {
+        updateRoutePath(lat, lng, selectedDestHub.lat, selectedDestHub.lng);
+      }
+    }
+  };
+
+  const selectDestSuggestion = (item) => {
+    const lat = parseFloat(item.lat);
+    const lng = parseFloat(item.lon);
+    const displayName = item.display_name.split(',')[0] + ', ' + (item.display_name.split(',')[1] || '').trim();
+    
+    setDestination(displayName);
+    setSelectedDestHub({ lat, lng, name: displayName });
+    setDestSuggestions([]);
+    setShowDestDropdown(false);
+
+    if (mapInstance.current) {
+      mapInstance.current.setView([lat, lng], 10);
+
+      const destIcon = window.L.divIcon({
+        html: `<div class="w-6 h-6 rounded-full bg-emerald-600 border border-white flex items-center justify-center shadow-lg shadow-emerald-600/30">
+                 <div class="w-2.5 h-2.5 rounded-full bg-white"></div>
+               </div>`,
+        className: '',
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+      });
+
+      if (markersRef.current.dest) {
+        markersRef.current.dest.setLatLng([lat, lng]);
+      } else {
+        markersRef.current.dest = window.L.marker([lat, lng], { icon: destIcon }).addTo(mapInstance.current);
+      }
+
+      if (selectedSourceHub) {
+        updateRoutePath(selectedSourceHub.lat, selectedSourceHub.lng, lat, lng);
+      }
+    }
+  };
+
+  // Leaflet Map Initialization and Click Routing logic
+  useEffect(() => {
+    if (wizardStep !== 1 || !modalOpen) {
+      if (mapInstance.current) {
+        try {
+          mapInstance.current.remove();
+        } catch (e) {
+          console.error(e);
+        }
+        mapInstance.current = null;
+      }
+      return;
+    }
+
+    // Dynamic stylesheet load
+    if (!document.getElementById('leaflet-css')) {
+      const link = document.createElement('link');
+      link.id = 'leaflet-css';
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+    }
+
+    const initMap = () => {
+      if (mapInstance.current) {
+        try {
+          mapInstance.current.remove();
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      const container = document.getElementById('map-container');
+      if (!container) return;
+
+      // Center map in India
+      const map = window.L.map('map-container').setView([20.5937, 78.9629], 5);
+      mapInstance.current = map;
+
+      // Premium Google Maps Tiles
+      window.L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+        maxZoom: 20,
+        subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+        attribution: 'Map data &copy; Google Maps'
+      }).addTo(map);
+
+      // Restore existing markers if they were set
+      markersRef.current = { source: null, dest: null, polyline: null };
+
+      if (selectedSourceHub) {
+        const sourceIcon = window.L.divIcon({
+          html: `<div class="w-6 h-6 rounded-full bg-violet-600 border border-white flex items-center justify-center shadow-lg shadow-violet-600/30">
+                   <div class="w-2.5 h-2.5 rounded-full bg-white animate-pulse"></div>
+                 </div>`,
+          className: '',
+          iconSize: [24, 24],
+          iconAnchor: [12, 12]
+        });
+        markersRef.current.source = window.L.marker([selectedSourceHub.lat, selectedSourceHub.lng], { icon: sourceIcon }).addTo(map);
+      }
+
+      if (selectedDestHub) {
+        const destIcon = window.L.divIcon({
+          html: `<div class="w-6 h-6 rounded-full bg-emerald-600 border border-white flex items-center justify-center shadow-lg shadow-emerald-600/30">
+                   <div class="w-2.5 h-2.5 rounded-full bg-white"></div>
+                 </div>`,
+          className: '',
+          iconSize: [24, 24],
+          iconAnchor: [12, 12]
+        });
+        markersRef.current.dest = window.L.marker([selectedDestHub.lat, selectedDestHub.lng], { icon: destIcon }).addTo(map);
+      }
+
+      if (selectedSourceHub && selectedDestHub) {
+        markersRef.current.polyline = window.L.polyline(
+          [[selectedSourceHub.lat, selectedSourceHub.lng], [selectedDestHub.lat, selectedDestHub.lng]],
+          { color: '#8b5cf6', weight: 3, dashArray: '6, 6' }
+        ).addTo(map);
+      }
+
+      // Click handler
+      map.on('click', async (e) => {
+        const { lat, lng } = e.latlng;
+
+        // Reset if both markers are already placed
+        if (markersRef.current.source && markersRef.current.dest) {
+          if (markersRef.current.source) map.removeLayer(markersRef.current.source);
+          if (markersRef.current.dest) map.removeLayer(markersRef.current.dest);
+          if (markersRef.current.polyline) map.removeLayer(markersRef.current.polyline);
+
+          markersRef.current = { source: null, dest: null, polyline: null };
+          setSelectedSourceHub(null);
+          setSelectedDestHub(null);
+          setSource('');
+          setDestination('');
+          setPlannedDistance('');
+        }
+
+        if (!markersRef.current.source) {
+          const sourceIcon = window.L.divIcon({
+            html: `<div class="w-6 h-6 rounded-full bg-violet-600 border border-white flex items-center justify-center shadow-lg shadow-violet-600/30">
+                     <div class="w-2.5 h-2.5 rounded-full bg-white animate-pulse"></div>
+                   </div>`,
+            className: '',
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+          });
+          const marker = window.L.marker([lat, lng], { icon: sourceIcon }).addTo(map);
+          markersRef.current.source = marker;
+          setSelectedSourceHub({ lat, lng });
+          
+          setSource("Resolving source address...");
+          try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10`);
+            const data = await res.json();
+            const addr = data.address.city || data.address.town || data.address.village || data.address.state || data.display_name.split(',')[0];
+            setSource(addr || `${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+          } catch (err) {
+            setSource(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+          }
+        } else if (!markersRef.current.dest) {
+          const destIcon = window.L.divIcon({
+            html: `<div class="w-6 h-6 rounded-full bg-emerald-600 border border-white flex items-center justify-center shadow-lg shadow-emerald-600/30">
+                     <div class="w-2.5 h-2.5 rounded-full bg-white"></div>
+                   </div>`,
+            className: '',
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+          });
+          const marker = window.L.marker([lat, lng], { icon: destIcon }).addTo(map);
+          markersRef.current.dest = marker;
+          setSelectedDestHub({ lat, lng });
+
+          setDestination("Resolving destination address...");
+          let destAddr = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+          try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10`);
+            const data = await res.json();
+            const addr = data.address.city || data.address.town || data.address.village || data.address.state || data.display_name.split(',')[0];
+            destAddr = addr || destAddr;
+            setDestination(destAddr);
+          } catch (err) {
+            setDestination(destAddr);
+          }
+
+          // Line drawing
+          const startLatLng = markersRef.current.source.getLatLng();
+          const polyline = window.L.polyline([startLatLng, [lat, lng]], {
+            color: '#8b5cf6',
+            weight: 3,
+            dashArray: '6, 6'
+          }).addTo(map);
+          markersRef.current.polyline = polyline;
+
+          // Haversine geodesic distance calculation
+          const lat1 = startLatLng.lat;
+          const lng1 = startLatLng.lng;
+          const lat2 = lat;
+          const lng2 = lng;
+
+          const R = 6371; // km
+          const dLat = (lat2 - lat1) * Math.PI / 180;
+          const dLon = (lng2 - lng1) * Math.PI / 180;
+          const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                    Math.sin(dLon/2) * Math.sin(dLon/2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+          const calculatedDistance = Math.round(R * c);
+
+          setPlannedDistance(calculatedDistance.toString());
+          setRevenue((calculatedDistance * 18).toString()); // auto money charged calculation
+        }
+      });
+    };
+
+    if (window.L) {
+      setTimeout(initMap, 100);
+    } else {
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      script.onload = initMap;
+      document.body.appendChild(script);
+    }
+
+    return () => {
+      if (mapInstance.current) {
+        try {
+          mapInstance.current.remove();
+        } catch (e) {
+          console.error(e);
+        }
+        mapInstance.current = null;
+      }
+    };
+  }, [wizardStep, modalOpen]);
 
   const openCompleteModal = (trip) => {
     setError('');
@@ -459,28 +811,77 @@ export default function Trips() {
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     {/* Source */}
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 relative">
                       <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Source Location</label>
                       <input
                         type="text"
                         value={source}
-                        onChange={(e) => setSource(e.target.value)}
-                        placeholder="e.g. Warehouse A"
+                        onChange={(e) => {
+                          setSource(e.target.value);
+                          setShowSourceDropdown(true);
+                        }}
+                        onFocus={() => setShowSourceDropdown(true)}
+                        onBlur={() => setTimeout(() => setShowSourceDropdown(false), 200)}
+                        placeholder="Search source (e.g. New Delhi)"
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-violet-500 focus:bg-white transition-colors"
                       />
+                      {showSourceDropdown && sourceSuggestions.length > 0 && (
+                        <ul className="absolute z-50 left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-lg divide-y divide-slate-100 text-xs">
+                          {sourceSuggestions.map((item, idx) => (
+                            <li
+                              key={idx}
+                              onClick={() => selectSourceSuggestion(item)}
+                              className="px-4 py-2.5 hover:bg-slate-50 cursor-pointer text-slate-700 truncate font-semibold"
+                            >
+                              {item.display_name}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
 
                     {/* Destination */}
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 relative">
                       <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Destination Location</label>
                       <input
                         type="text"
                         value={destination}
-                        onChange={(e) => setDestination(e.target.value)}
-                        placeholder="e.g. Retail Center 9"
+                        onChange={(e) => {
+                          setDestination(e.target.value);
+                          setShowDestDropdown(true);
+                        }}
+                        onFocus={() => setShowDestDropdown(true)}
+                        onBlur={() => setTimeout(() => setShowDestDropdown(false), 200)}
+                        placeholder="Search destination (e.g. Mumbai)"
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-violet-500 focus:bg-white transition-colors"
                       />
+                      {showDestDropdown && destSuggestions.length > 0 && (
+                        <ul className="absolute z-50 left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-lg divide-y divide-slate-100 text-xs">
+                          {destSuggestions.map((item, idx) => (
+                            <li
+                              key={idx}
+                              onClick={() => selectDestSuggestion(item)}
+                              className="px-4 py-2.5 hover:bg-slate-50 cursor-pointer text-slate-700 truncate font-semibold"
+                            >
+                              {item.display_name}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
+                  </div>
+
+                  {/* Google Map Selector */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center px-1">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Interactive Map Routing (Google Tiles)</label>
+                      <span className="text-[10px] text-slate-400 font-semibold italic">Click map to set Source (Purple) & Destination (Green)</span>
+                    </div>
+                    <div 
+                      id="map-container" 
+                      className="w-full h-64 bg-slate-100 border border-slate-200 rounded-2xl relative overflow-hidden z-0 shadow-inner"
+                      style={{ minHeight: '256px' }}
+                    />
                   </div>
 
                   {/* Planned Distance */}
