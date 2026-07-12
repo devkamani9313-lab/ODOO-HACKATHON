@@ -240,8 +240,8 @@ function AppContent() {
                 {/* Mock map/image area */}
                 <div className="relative rounded-2xl overflow-hidden border border-white/[0.08] h-48">
                   <img 
-                    src="https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&q=80&w=800" 
-                    alt="Fleet of trucks"
+                    src="/hero-truck.png" 
+                    alt="Modern Enterprise Freight Truck"
                     className="w-full h-full object-cover opacity-60"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#060611] via-transparent to-transparent" />
